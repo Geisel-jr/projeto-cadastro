@@ -1,70 +1,95 @@
-# Getting Started with Create React App
+# CadastroHub
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+Sistema de cadastro de **empresas** e **pessoas**, com front-end em React, API em Node.js/Express e banco PostgreSQL, tudo rodando em containers Docker.
 
-## Available Scripts
+## Funcionalidades
 
-In the project directory, you can run:
+- Cadastro e listagem de empresas e pessoas
+- Máscaras automáticas para CPF, CNPJ, telefone e CEP
+- Validação de CPF e CNPJ pelos dígitos verificadores (no front e na API)
+- Preenchimento automático do endereço pelo CEP ([ViaCEP](https://viacep.com.br))
+- Busca nas listagens por nome, documento, e-mail ou cidade
+- Bloqueio de CPF/CNPJ duplicado
+- Layout responsivo (desktop e celular)
 
-### `npm start`
+## Tecnologias
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+| Camada | Tecnologia |
+| --- | --- |
+| Front-end | React 19, Bootstrap 5, CSS próprio |
+| API | Node.js, Express 5, `pg` |
+| Banco | PostgreSQL 16 |
+| Infra | Docker, Docker Compose, Nginx |
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+## Estrutura
 
-### `npm test`
+```
+├── src/                  # Front-end React
+│   ├── components/       # Componentes reutilizáveis (tabela, campos, ícones, avisos)
+│   ├── utils/            # Máscaras, validações e formatação
+│   └── api.js            # Chamadas à API
+├── api/                  # API Node.js/Express
+│   ├── server.js         # Rotas
+│   └── validacoes.js     # Validação dos dados recebidos
+├── db/init.sql           # Criação das tabelas
+├── nginx.conf            # Servidor do front (repassa /api para a API)
+├── dockerfile            # Imagem do front
+└── docker-compose.yml    # Sobe banco, API e front juntos
+```
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+## Como rodar com Docker (recomendado)
 
-### `npm run build`
+Pré-requisito: [Docker Desktop](https://www.docker.com/products/docker-desktop/) aberto.
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+```bash
+docker compose up -d --build
+```
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+Depois acesse:
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+- **Front-end:** http://localhost:3000
+- **API:** http://localhost:5000/api/health
+- **Banco:** `localhost:5433` (usuário `postgres`, senha `postgres`)
 
-### `npm run eject`
+As tabelas são criadas automaticamente na primeira execução. Para parar:
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+```bash
+docker compose down
+```
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+Para parar **e apagar os dados** do banco: `docker compose down -v`.
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+## Como rodar sem Docker (desenvolvimento)
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+1. Crie o banco `cadastros_db` no seu PostgreSQL e execute o `db/init.sql`.
+2. API:
+   ```bash
+   cd api
+   cp .env.example .env   # edite com a senha do seu PostgreSQL
+   npm install
+   npm run dev
+   ```
+3. Front-end (em outro terminal, na raiz do projeto):
+   ```bash
+   npm install
+   npm start
+   ```
+   O front abre em http://localhost:3000 e usa a API em `http://localhost:5000/api`.
 
-## Learn More
+## Endpoints da API
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+| Método | Rota | Descrição |
+| --- | --- | --- |
+| GET | `/api/health` | Verifica se a API e o banco estão no ar |
+| GET | `/api/empresas` | Lista empresas |
+| POST | `/api/empresas` | Cadastra empresa |
+| GET | `/api/pessoas` | Lista pessoas |
+| POST | `/api/pessoas` | Cadastra pessoa |
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+Respostas de erro: `400` (dados inválidos), `409` (CPF/CNPJ já cadastrado), `500` (erro interno).
 
-### Code Splitting
+## Testes
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
-
-### Analyzing the Bundle Size
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
-
-### Making a Progressive Web App
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
-
-### Advanced Configuration
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
-
-### Deployment
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+```bash
+npm test
+```
