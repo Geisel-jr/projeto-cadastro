@@ -1,5 +1,7 @@
 # CadastroHub
 
+[![CI](https://github.com/Geisel-jr/projeto-cadastro/actions/workflows/ci.yml/badge.svg)](https://github.com/Geisel-jr/projeto-cadastro/actions/workflows/ci.yml)
+
 Sistema de cadastro de **empresas** e **pessoas**, com front-end em React, API em Node.js/Express e banco PostgreSQL, tudo rodando em containers Docker.
 
 ## Funcionalidades

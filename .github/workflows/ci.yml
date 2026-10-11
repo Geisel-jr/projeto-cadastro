@@ -1,0 +1,97 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  front:
+    name: Front-end (testes e build)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Instalar dependências
+        run: npm install
+
+      - name: Rodar testes
+        run: npm test -- --watchAll=false
+        env:
+          CI: true
+
+      - name: Gerar build
+        run: npm run build
+
+  api:
+    name: API (dependências e sintaxe)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: api
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: api/package-lock.json
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Verificar sintaxe
+        run: node --check server.js && node --check validacoes.js
+
+  docker:
+    name: Docker (sobe tudo e testa)
+    runs-on: ubuntu-latest
+    needs: [front, api]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Subir containers
+        run: docker compose up -d --build --wait
+
+      - name: Testar front e API
+        run: |
+          set -e
+          H='Content-Type: application/json'
+          URL=http://localhost:3000
+
+          echo "→ Front responde"
+          curl -sf $URL > /dev/null
+
+          echo "→ API e banco estão no ar"
+          curl -sf $URL/api/health
+
+          echo "→ Cadastro de empresa válida retorna 201"
+          test "$(curl -s -o /dev/null -w '%{http_code}' -X POST $URL/api/empresas -H "$H" \
+            -d '{"nome":"Empresa CI","cnpj":"11222333000181","email":"ci@teste.com","telefone":"11988887777","cep":"01001000"}')" = 201
+
+          echo "→ CNPJ duplicado retorna 409"
+          test "$(curl -s -o /dev/null -w '%{http_code}' -X POST $URL/api/empresas -H "$H" \
+            -d '{"nome":"Outra","cnpj":"11222333000181","email":"a@b.com","telefone":"11988887777","cep":"01001000"}')" = 409
+
+          echo "→ Pessoa inválida retorna 400"
+          test "$(curl -s -o /dev/null -w '%{http_code}' -X POST $URL/api/pessoas -H "$H" -d '{"nome":"X"}')" = 400
+
+          echo "→ Cadastro de pessoa válida retorna 201"
+          test "$(curl -s -o /dev/null -w '%{http_code}' -X POST $URL/api/pessoas -H "$H" \
+            -d '{"nome":"Maria da Silva","cpf":"12345678909","email":"maria@email.com","telefone":"31999990000","dataNascimento":"1995-04-20","profissao":"QA"}')" = 201
+
+          echo "✅ Todos os testes passaram"
+
+      - name: Logs dos containers (em caso de falha)
+        if: failure()
+        run: docker compose logs
+
+      - name: Derrubar containers
+        if: always()
+        run: docker compose down -v
