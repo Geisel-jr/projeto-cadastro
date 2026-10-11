@@ -1,6 +1,6 @@
 import { CADASTROS } from '../cadastros';
 import { camposDe, formatarValor } from '../cadastros/campos';
-import { formatarDataHora, iniciais } from '../utils/formatadores';
+import { corAvatar, formatarDataHora, iniciais } from '../utils/formatadores';
 
 const ACOES = {
   CRIAR: { verbo: 'cadastrou', rotulo: 'Criação', classe: 'criar' },
@@ -34,7 +34,7 @@ export default function Historico({ itens, mostrarRegistro = false, onAbrir }) {
 
   return (
     <ul className="historico">
-      {itens.map((item) => {
+      {itens.map((item, indice) => {
         const config = CADASTROS[item.entidade];
         const acao = ACOES[item.acao];
         const dados = item.dadosNovos || item.dadosAnteriores;
@@ -42,8 +42,9 @@ export default function Historico({ itens, mostrarRegistro = false, onAbrir }) {
         const mudancas = item.acao === 'EDITAR' && config ? alteracoes(config, item.dadosAnteriores, item.dadosNovos) : [];
 
         return (
-          <li key={item.id}>
-            <span className="avatar" title={item.usuario}>{iniciais(item.usuario)}</span>
+          // Entrada em cascata; o atraso para de crescer no 9º item para listas longas não demorarem
+          <li key={item.id} style={{ '--i': Math.min(indice, 8) }}>
+            <span className="avatar colorido" style={corAvatar(item.usuario)} title={item.usuario}>{iniciais(item.usuario)}</span>
             <div className="historico-conteudo">
               <div className="historico-linha">
                 <span>
@@ -64,7 +65,11 @@ export default function Historico({ itens, mostrarRegistro = false, onAbrir }) {
               </span>
 
               {acao.anexo && dados && <div className="historico-detalhe">{descreverDocumento(dados)}</div>}
-              {item.motivo && <div className="historico-detalhe">Motivo: {item.motivo}</div>}
+              {item.motivo && (
+                <div className="historico-detalhe" title={item.motivo}>
+                  <span className="limite-linhas">Motivo: {item.motivo}</span>
+                </div>
+              )}
               {mudancas.length > 0 && (
                 <ul className="historico-detalhe mudancas">
                   {mudancas.map((m) => (
@@ -78,6 +83,23 @@ export default function Historico({ itens, mostrarRegistro = false, onAbrir }) {
           </li>
         );
       })}
+    </ul>
+  );
+}
+
+// Esqueleto no formato da linha do tempo, exibido enquanto ela carrega
+export function EsqueletoHistorico({ linhas = 4 }) {
+  return (
+    <ul className="historico" aria-label="Carregando" aria-busy="true">
+      {[58, 44, 66, 50, 38].slice(0, linhas).map((largura, i) => (
+        <li key={i} className="esqueleto-item">
+          <span className="esq circulo" />
+          <div className="historico-conteudo">
+            <span className="esq" style={{ width: `${largura}%` }} />
+            <span className="esq curto" style={{ width: '22%' }} />
+          </div>
+        </li>
+      ))}
     </ul>
   );
 }

@@ -11,7 +11,7 @@ import {
 import { tipoDe } from '../cadastros/tipos';
 import Abas from '../components/Abas';
 import Campo from '../components/Campo';
-import Historico from '../components/Historico';
+import Historico, { EsqueletoHistorico } from '../components/Historico';
 import Icone from '../components/Icone';
 import ModalExclusao from '../components/ModalExclusao';
 import PainelDocumentos from '../components/PainelDocumentos';
@@ -188,7 +188,30 @@ export default function FormularioCadastro({ config, id, onNavegar, notificar })
   };
 
   if (carregando) {
-    return <div className="carregando"><span className="spinner" /></div>;
+    // Esqueleto com o formato do formulário: cabeçalho, abas e uma grade de campos
+    return (
+      <div aria-label="Carregando" aria-busy="true">
+        <div className="page-header">
+          <div className="esqueleto-titulo">
+            <span className="esq" style={{ width: 90 }} />
+            <span className="esq grande" style={{ width: 220 }} />
+          </div>
+        </div>
+        <div className="painel">
+          <div className="abas esqueleto-abas">
+            {[96, 120, 88].map((largura) => <span key={largura} className="esq" style={{ width: largura }} />)}
+          </div>
+          <div className="painel-corpo grade">
+            {[6, 6, 6, 6, 3, 3, 3, 3].map((col, i) => (
+              <div className="campo" key={i} style={{ '--col': col }}>
+                <span className="esq" style={{ width: '40%', marginBottom: '.55rem' }} />
+                <span className="esq entrada-esqueleto" />
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
   }
   if (erroCarga) {
     return (
@@ -276,7 +299,7 @@ export default function FormularioCadastro({ config, id, onNavegar, notificar })
 
       <div className="painel-corpo">
         {aba === 'historico' ? (
-          historico ? <Historico itens={historico} /> : <div className="carregando"><span className="spinner" /></div>
+          historico ? <Historico itens={historico} /> : <EsqueletoHistorico linhas={3} />
         ) : (
           <div className="grade" key={aba}>
             {abaAtual.campos.map((campo) => (!campo.visivel || campo.visivel(dados) ? renderCampo(campo) : null))}

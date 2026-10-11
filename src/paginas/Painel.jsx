@@ -1,7 +1,13 @@
 import { useEffect, useState } from 'react';
 import { api, mensagemErro } from '../api';
-import Historico from '../components/Historico';
+import Historico, { EsqueletoHistorico } from '../components/Historico';
 import Icone from '../components/Icone';
+
+// "sábado, 11 de outubro" -> "Sábado, 11 de outubro"
+const hoje = () => {
+  const texto = new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' });
+  return texto.charAt(0).toUpperCase() + texto.slice(1);
+};
 
 export default function Painel({ onNavegar }) {
   const [resumo, setResumo] = useState(null);
@@ -35,6 +41,7 @@ export default function Painel({ onNavegar }) {
     {
       titulo: 'Ações nas últimas 24h',
       valor: resumo?.acoesDia,
+      detalhe: 'Ver auditoria completa',
       icone: 'escudo',
       rota: { pagina: 'auditoria' },
     },
@@ -43,7 +50,10 @@ export default function Painel({ onNavegar }) {
   return (
     <>
       <div className="page-header">
-        <h1 className="page-title">Painel</h1>
+        <div>
+          <span className="page-sobretitulo">{hoje()}</span>
+          <h1 className="page-title">Painel</h1>
+        </div>
       </div>
 
       {erro && (
@@ -53,15 +63,20 @@ export default function Painel({ onNavegar }) {
         </div>
       )}
 
-      <div className="cards">
+      <div className="painel resumo">
         {cards.map((card) => (
-          <button className="card-stat" key={card.titulo} onClick={() => onNavegar(card.rota)}>
-            <span className="stat-icone"><Icone nome={card.icone} tamanho={18} /></span>
-            <span>
-              <span className="stat-label">{card.titulo}</span>
-              <span className="stat-valor">{card.valor ?? '—'}</span>
-              {card.detalhe && <span className="stat-detalhe">{card.detalhe}</span>}
+          <button className="resumo-item" key={card.titulo} onClick={() => onNavegar(card.rota)}>
+            <span className="resumo-rotulo">
+              <Icone nome={card.icone} tamanho={15} />
+              {card.titulo}
+              <Icone nome="seta" tamanho={14} className="resumo-seta" />
             </span>
+            {resumo || erro ? (
+              <span className="stat-valor">{card.valor ?? '—'}</span>
+            ) : (
+              <span className="esq stat-esqueleto" aria-label="Carregando" />
+            )}
+            <span className="stat-detalhe">{card.detalhe || '\u00a0'}</span>
           </button>
         ))}
       </div>
@@ -74,9 +89,7 @@ export default function Painel({ onNavegar }) {
         <div className="painel-corpo">
           {atividades ? (
             <Historico itens={atividades} mostrarRegistro onAbrir={(entidade, id) => onNavegar({ pagina: 'form', entidade, id })} />
-          ) : !erro && (
-            <div className="carregando"><span className="spinner" /></div>
-          )}
+          ) : !erro && <EsqueletoHistorico />}
         </div>
       </div>
     </>

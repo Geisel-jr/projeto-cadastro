@@ -181,9 +181,9 @@ export default function ListaCadastro({ config, onNavegar, notificar }) {
             <kbd className="atalho">/</kbd>
           </div>
 
-          <div className="segmentado" role="group" aria-label="Situação">
-            <button className={!verExcluidos ? 'ativo' : ''} onClick={() => setStatus('ativos')}>Ativos</button>
-            <button className={verExcluidos ? 'ativo' : ''} onClick={() => setStatus('excluidos')}>Excluídos</button>
+          <div className="segmentado" role="group" aria-label="Situação" data-ativo={verExcluidos ? 1 : 0}>
+            <button className={!verExcluidos ? 'ativo' : ''} aria-pressed={!verExcluidos} onClick={() => setStatus('ativos')}>Ativos</button>
+            <button className={verExcluidos ? 'ativo' : ''} aria-pressed={verExcluidos} onClick={() => setStatus('excluidos')}>Excluídos</button>
           </div>
 
           <div className="toolbar-fim">

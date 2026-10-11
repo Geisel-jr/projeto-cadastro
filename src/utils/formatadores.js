@@ -90,6 +90,14 @@ export function iniciais(nome = '') {
   return (primeira + ultima).toUpperCase();
 }
 
+// Cor do avatar derivada do nome: a mesma pessoa tem sempre a mesma cor.
+// Saturação baixa para não competir com o azul de destaque.
+export function corAvatar(nome = '') {
+  let hash = 0;
+  for (const letra of nome.trim().toLowerCase()) hash = (hash * 31 + letra.charCodeAt(0)) % 360;
+  return { '--avatar-h': hash };
+}
+
 // "2026-10-11T14:03:00Z" -> "11/10/2026 11:03"
 export function formatarDataHora(valor) {
   if (!valor) return '—';

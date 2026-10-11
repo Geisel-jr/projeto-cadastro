@@ -41,7 +41,6 @@
 
   /* Saída rápida, chegada suave. Saídas são mais curtas que entradas. */
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
-  --ease-in: cubic-bezier(0.55, 0, 1, 0.45);
   --rapido: 150ms;
   --medio: 220ms;
 }
@@ -208,26 +207,29 @@ kbd.atalho {
   font-size: 11.5px; font-weight: 600; font-variant-numeric: tabular-nums;
 }
 
-.cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .75rem; margin-bottom: .75rem; }
-.card-stat {
-  display: flex; align-items: flex-start; gap: .85rem;
-  padding: 1rem 1.1rem; text-align: left;
-  background: var(--superficie); border: 1px solid var(--borda); border-radius: var(--raio-g);
-  box-shadow: var(--sombra-2);
-  transition: border-color var(--rapido) ease, transform 100ms var(--ease-out);
+/* Resumo do painel: uma faixa única dividida em colunas, em vez de três cards soltos */
+.resumo { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin-bottom: .75rem; overflow: hidden; }
+.resumo-item {
+  display: flex; flex-direction: column; align-items: flex-start; gap: .35rem;
+  padding: 1.05rem 1.25rem 1.15rem; border: 0; background: none; text-align: left;
+  transition: background-color var(--rapido) ease;
 }
-.card-stat:active { transform: scale(.99); }
-.stat-label { display: block; color: var(--texto-2); font-size: 13px; }
+.resumo-item + .resumo-item { border-left: 1px solid var(--borda); }
+.resumo-item:focus-visible { border-radius: 0; box-shadow: inset 0 0 0 2px rgba(41, 82, 204, .35); }
+.resumo-rotulo { display: flex; align-items: center; gap: .45rem; width: 100%; color: var(--texto-2); font-size: 13px; font-weight: 500; }
+.resumo-rotulo svg { color: var(--texto-3); }
+.resumo-seta {
+  margin-left: auto; opacity: 0; transform: translateX(-4px);
+  transition: opacity var(--rapido) ease, transform var(--medio) var(--ease-out);
+}
 .stat-valor {
-  display: block; margin: .15rem 0;
-  font-size: 28px; font-weight: 600; letter-spacing: -.03em; line-height: 1.1;
+  display: block;
+  font-size: 34px; font-weight: 600; letter-spacing: -.035em; line-height: 1.1;
   font-variant-numeric: tabular-nums;
+  animation: surgir var(--medio) var(--ease-out);
 }
+.stat-esqueleto { width: 56px; height: 37px; border-radius: 6px; }
 .stat-detalhe { display: block; color: var(--texto-3); font-size: 12px; }
-.stat-icone {
-  flex-shrink: 0; width: 34px; height: 34px; border-radius: var(--raio);
-  display: grid; place-items: center; background: var(--hover); color: var(--texto-2);
-}
 
 .avatar {
   flex-shrink: 0; width: 32px; height: 32px; border-radius: 50%;
@@ -238,6 +240,12 @@ kbd.atalho {
 .avatar.pequeno { width: 24px; height: 24px; font-size: 10px; }
 .avatar.azul { background: var(--acento-suave); color: var(--acento); }
 .avatar.verde { background: var(--sucesso-suave); color: var(--sucesso); }
+/* Matiz vindo do nome (corAvatar); saturação baixa mantém o azul como único destaque */
+.avatar.colorido {
+  background: hsl(var(--avatar-h) 32% 93%);
+  color: hsl(var(--avatar-h) 30% 34%);
+  box-shadow: inset 0 0 0 1px hsl(var(--avatar-h) 25% 86%);
+}
 
 .aviso {
   display: flex; align-items: flex-start; gap: .65rem;
@@ -423,13 +431,25 @@ select.entrada {
 .filtro { width: auto; min-width: 170px; }
 .toolbar-fim { display: flex; align-items: center; gap: .5rem; margin-left: auto; color: var(--texto-3); font-size: 12.5px; font-variant-numeric: tabular-nums; }
 
-.segmentado { display: inline-flex; gap: 2px; padding: 2px; background: var(--hover); border: 1px solid var(--borda); border-radius: var(--raio); }
+/* Controle segmentado: o fundo da opção ativa desliza em vez de trocar de lugar */
+.segmentado {
+  position: relative; display: inline-grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 2px;
+  padding: 2px; background: var(--hover); border: 1px solid var(--borda); border-radius: var(--raio);
+}
+.segmentado::before {
+  content: ''; position: absolute; top: 2px; bottom: 2px; left: 2px;
+  width: calc((100% - 6px) / 2); border-radius: 6px;
+  background: var(--superficie); box-shadow: var(--sombra-1), 0 0 0 1px var(--borda);
+  transition: transform var(--medio) var(--ease-out);
+}
+.segmentado[data-ativo="1"]::before { transform: translateX(calc(100% + 2px)); }
 .segmentado button {
+  position: relative; z-index: 1;
   height: 28px; padding: 0 .75rem; border: 0; border-radius: 6px;
   background: none; color: var(--texto-2); font-size: 13px; font-weight: 500;
-  transition: background-color var(--rapido) ease, color var(--rapido) ease, box-shadow var(--rapido) ease;
+  transition: color var(--rapido) ease;
 }
-.segmentado button.ativo { background: var(--superficie); color: var(--texto); box-shadow: var(--sombra-1), 0 0 0 1px var(--borda); }
+.segmentado button.ativo { color: var(--texto); }
 
 .rolagem-x { position: relative; overflow-x: auto; }
 .tabela { width: 100%; border-collapse: collapse; }
@@ -483,6 +503,12 @@ select.entrada {
 }
 .esq.circulo { width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0; }
 .esq.curto { width: 40%; margin-top: .5rem; }
+.esq.grande { height: 20px; border-radius: 5px; }
+.esq.entrada-esqueleto { height: 36px; border-radius: var(--raio); }
+.esqueleto-titulo { display: grid; gap: .5rem; padding-top: .15rem; }
+.esqueleto-abas { align-items: center; gap: 1.25rem; height: 45px; padding: 0 1.1rem; }
+.historico > li.esqueleto-item { animation: none; }
+.esqueleto-item .historico-conteudo { padding-top: .45rem; }
 
 /* ==========================================================
    Histórico (auditoria)
@@ -490,6 +516,7 @@ select.entrada {
 .historico > li {
   position: relative; display: flex; gap: .8rem; padding-bottom: 1.1rem;
   animation: surgir var(--medio) var(--ease-out) both;
+  animation-delay: calc(var(--i, 0) * 35ms);
 }
 .historico > li:last-child { padding-bottom: 0; }
 .historico > li:not(:last-child)::before {
@@ -537,8 +564,8 @@ select.entrada {
   box-shadow: var(--sombra-3), 0 0 0 1px rgba(24, 24, 27, .06);
   animation: entrar-modal var(--medio) var(--ease-out);
 }
-.modal-fundo.saindo { animation: sumir var(--rapido) var(--ease-in) forwards; }
-.modal-fundo.saindo .modal-caixa { animation: sair-modal var(--rapido) var(--ease-in) forwards; }
+.modal-fundo.saindo { animation: sumir var(--rapido) var(--ease-out) forwards; }
+.modal-fundo.saindo .modal-caixa { animation: sair-modal var(--rapido) var(--ease-out) forwards; }
 .modal-topo { display: flex; justify-content: space-between; align-items: center; gap: .5rem; padding: 1rem 1.1rem .25rem; }
 .modal-topo h2 { font-size: 15px; font-weight: 600; }
 .modal-corpo { display: grid; gap: .75rem; padding: .5rem 1.1rem 1rem; overflow-wrap: anywhere; }
@@ -562,9 +589,9 @@ select.entrada {
   padding: .75rem .85rem;
   background: var(--superficie); border: 1px solid var(--borda); border-radius: var(--raio-g);
   box-shadow: var(--sombra-3); font-size: 13.5px; overflow-wrap: anywhere;
-  animation: entrar-toast 320ms var(--ease-out);
+  animation: entrar-toast 280ms var(--ease-out);
 }
-.toast-item.saindo { animation: sair-toast var(--rapido) var(--ease-in) forwards; }
+.toast-item.saindo { animation: sair-toast var(--rapido) var(--ease-out) forwards; }
 .toast-texto { flex: 1; min-width: 0; }
 .toast-texto strong { display: block; font-weight: 500; }
 .toast-texto small { color: var(--texto-3); font-size: 12.5px; }
@@ -586,7 +613,9 @@ select.entrada {
   .menu-item:hover { color: var(--texto); }
   .menu-item:not(.ativo):hover { background: rgba(24, 24, 27, .04); }
   .operador:hover { border-color: var(--borda-forte); }
-  .card-stat:hover { border-color: var(--borda-forte); }
+  .resumo-item:hover { background: var(--superficie-2); }
+  .resumo-item:hover .resumo-seta { opacity: 1; transform: none; color: var(--texto-2); }
+  .entrada:hover:not(:focus):not(:disabled):not(.invalida) { border-color: var(--borda-forte); }
   .aba:hover { color: var(--texto); }
   .linha-clicavel:hover td { background: var(--superficie-2); }
   .btn-acao:hover { background: var(--hover); color: var(--texto); }
@@ -610,17 +639,22 @@ select.entrada {
 @keyframes entrar-modal { from { opacity: 0; transform: scale(.96) translateY(4px); } to { opacity: 1; transform: none; } }
 @keyframes sair-modal { to { opacity: 0; transform: scale(.97); } }
 @keyframes entrar-toast { from { opacity: 0; transform: translateY(12px) scale(.98); } to { opacity: 1; transform: none; } }
-@keyframes sair-toast { to { opacity: 0; transform: translateX(16px); } }
+@keyframes sair-toast { to { opacity: 0; transform: translateY(8px) scale(.98); } }
 @keyframes brilho { from { background-position: 100% 0; } to { background-position: -100% 0; } }
 @keyframes girar { to { transform: rotate(360deg); } }
 
+/* Movimento reduzido: mantém os fades (ajudam a entender a mudança),
+   remove deslocamentos e escalas. */
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
-    animation-duration: 1ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 1ms !important;
-  }
-  .spinner { animation-duration: 1.4s !important; animation-iteration-count: infinite !important; }
+  @keyframes surgir { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes entrar-modal { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes sair-modal { to { opacity: 0; } }
+  @keyframes entrar-toast { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes sair-toast { to { opacity: 0; } }
+  .historico > li { animation-delay: 0ms; }
+  .btn:active:not(:disabled), .btn-icone:active, .btn-acao:active { transform: none; }
+  .aba-indicador, .segmentado::before, .resumo-seta { transition: none; }
+  .esq { animation: none; }
 }
 
 /* ==========================================================
@@ -646,8 +680,29 @@ select.entrada {
   .toolbar-fim { margin-left: 0; }
   .page-title { font-size: 20px; }
   .modal-rodape .btn { flex: 1; }
-  .cards { grid-template-columns: minmax(0, 1fr); }
+  .resumo { grid-template-columns: minmax(0, 1fr); }
+  .resumo-item + .resumo-item { border-left: 0; border-top: 1px solid var(--borda); }
+  /* No celular cada indicador vira uma linha: rótulo à esquerda, número à direita */
+  .resumo-item {
+    display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center;
+    column-gap: 1rem; row-gap: .1rem; padding: .8rem 1rem;
+  }
+  .resumo-item > .stat-valor, .resumo-item > .stat-esqueleto { grid-column: 2; grid-row: 1 / span 2; }
+  .resumo-item > .stat-detalhe { padding-left: calc(15px + .45rem); }
+  .resumo-seta { display: none; }
+  .stat-valor { font-size: 26px; }
+  .stat-esqueleto { height: 29px; }
 }
+
+/* Link "pular para o conteúdo": só aparece ao receber foco pelo teclado */
+.pular {
+  position: fixed; top: .5rem; left: .5rem; z-index: 3000;
+  padding: .45rem .8rem; border-radius: var(--raio);
+  background: var(--texto); color: #fff; font-size: 13px; font-weight: 500; text-decoration: none;
+  transform: translateY(-160%);
+}
+.pular:focus-visible { transform: none; box-shadow: var(--anel); }
+.conteudo:focus { outline: none; }
 
 /* Texto só para leitores de tela */
 .visualmente-oculto {

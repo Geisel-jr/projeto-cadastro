@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api, mensagemErro } from '../api';
-import Historico from '../components/Historico';
+import Historico, { EsqueletoHistorico } from '../components/Historico';
 import Icone from '../components/Icone';
 
 const LIMITE = 30;
@@ -92,7 +92,7 @@ export default function Auditoria({ onNavegar }) {
                   onAbrir={(entidade, id) => onNavegar({ pagina: 'form', entidade, id })}
                 />
               )}
-              {carregando && <div className="carregando"><span className="spinner" /></div>}
+              {carregando && (pagina === 1 ? <EsqueletoHistorico linhas={5} /> : <div className="carregando"><span className="spinner" /></div>)}
               {temMais && !carregando && (
                 <div className="carregar-mais">
                   <button className="btn btn-secundario btn-pequeno" onClick={() => setConsulta((c) => ({ ...c, pagina: c.pagina + 1 }))}>

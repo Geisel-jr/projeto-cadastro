@@ -9,7 +9,7 @@ import Auditoria from './paginas/Auditoria';
 import FormularioCadastro from './paginas/FormularioCadastro';
 import ListaCadastro from './paginas/ListaCadastro';
 import Painel from './paginas/Painel';
-import { iniciais } from './utils/formatadores';
+import { corAvatar, iniciais } from './utils/formatadores';
 
 const MENU = [
   { id: 'painel', label: 'Painel', icone: 'home', rota: { pagina: 'painel' } },
@@ -57,6 +57,7 @@ function App() {
 
   return (
     <>
+      <a className="pular" href="#conteudo">Pular para o conteúdo</a>
       <header className="topbar">
         <div className="container topbar-inner">
           <button className="marca" onClick={() => navegar({ pagina: 'painel' })}>
@@ -81,14 +82,14 @@ function App() {
 
           {operador && (
             <button className="operador" onClick={() => setTrocandoOperador(true)} title="Trocar operador">
-              <span className="avatar pequeno">{iniciais(operador)}</span>
+              <span className="avatar pequeno colorido" style={corAvatar(operador)}>{iniciais(operador)}</span>
               <span className="operador-nome truncar">{operador}</span>
             </button>
           )}
         </div>
       </header>
 
-      <main className="container conteudo">
+      <main className="container conteudo" id="conteudo" tabIndex={-1}>
         {rota.pagina === 'painel' && <Painel {...props} />}
         {rota.pagina === 'auditoria' && <Auditoria {...props} />}
         {rota.pagina === 'lista' && <ListaCadastro key={rota.entidade} config={config} {...props} />}
