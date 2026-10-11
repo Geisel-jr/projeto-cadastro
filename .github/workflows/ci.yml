@@ -62,29 +62,48 @@ jobs:
       - name: Testar front e API
         run: |
           set -e
-          H='Content-Type: application/json'
-          URL=http://localhost:3000
+          URL=http://localhost:3000/api
+          J='Content-Type: application/json'
+          U='X-Usuario: CI'
+          EMPRESA='{"nome":"Empresa CI","cnpj":"11222333000181","email":"ci@teste.com","telefone":"11988887777","cep":"01001000"}'
+
+          # status HTTP de uma requisição
+          status() { curl -s -o /dev/null -w '%{http_code}' "$@"; }
+          esperar() { echo "→ $1"; test "$2" = "$3" || { echo "  esperado $3, recebido $2"; exit 1; }; }
 
           echo "→ Front responde"
-          curl -sf $URL > /dev/null
-
+          curl -sf http://localhost:3000 > /dev/null
           echo "→ API e banco estão no ar"
-          curl -sf $URL/api/health
+          curl -sf $URL/health
 
-          echo "→ Cadastro de empresa válida retorna 201"
-          test "$(curl -s -o /dev/null -w '%{http_code}' -X POST $URL/api/empresas -H "$H" \
-            -d '{"nome":"Empresa CI","cnpj":"11222333000181","email":"ci@teste.com","telefone":"11988887777","cep":"01001000"}')" = 201
+          esperar "Alteração sem operador retorna 401" "$(status -X POST $URL/empresas -H "$J" -d "$EMPRESA")" 401
+          esperar "Empresa válida retorna 201" "$(status -X POST $URL/empresas -H "$J" -H "$U" -d "$EMPRESA")" 201
+          esperar "CNPJ duplicado retorna 409" "$(status -X POST $URL/empresas -H "$J" -H "$U" -d "$EMPRESA")" 409
+          esperar "Edição retorna 200" "$(status -X PUT $URL/empresas/1 -H "$J" -H "$U" \
+            -d '{"nome":"Empresa CI Editada","cnpj":"11222333000181","email":"ci@teste.com","telefone":"1133334444","cep":"01001000","porte":"ME"}')" 200
+          esperar "Exclusão sem motivo retorna 400" "$(status -X DELETE $URL/empresas/1 -H "$J" -H "$U" -d '{}')" 400
+          esperar "Exclusão com motivo retorna 200" "$(status -X DELETE $URL/empresas/1 -H "$J" -H "$U" -d '{"motivo":"Teste da CI"}')" 200
+          esperar "Registro excluído some dos ativos" "$(curl -s $URL/empresas)" "[]"
+          esperar "Registro excluído continua no banco" "$(curl -s "$URL/empresas?status=excluidos" | grep -c 'Teste da CI')" 1
+          esperar "Restauração retorna 200" "$(status -X POST $URL/empresas/1/restaurar -H "$U")" 200
+          esperar "Auditoria registrou as 4 ações" "$(curl -s $URL/empresas/1/historico | grep -o '"acao"' | wc -l)" 4
 
-          echo "→ CNPJ duplicado retorna 409"
-          test "$(curl -s -o /dev/null -w '%{http_code}' -X POST $URL/api/empresas -H "$H" \
-            -d '{"nome":"Outra","cnpj":"11222333000181","email":"a@b.com","telefone":"11988887777","cep":"01001000"}')" = 409
+          # Documentos (arquivos no MinIO)
+          PASTA=$(mktemp -d)
+          printf '%%PDF-1.4\n%%teste CI\n' > "$PASTA/cartao.pdf"
+          printf 'Cart\303\243o CNPJ' > "$PASTA/tipo.txt"   # "Cartão CNPJ" em UTF-8
+          esperar "Anexo sem arquivo retorna 400" "$(status -X POST $URL/empresas/1/documentos -H "$U" -F "tipo=<$PASTA/tipo.txt")" 400
+          esperar "Anexo de documento retorna 201" "$(status -X POST $URL/empresas/1/documentos -H "$U" \
+            -F "tipo=<$PASTA/tipo.txt" -F "arquivo=@$PASTA/cartao.pdf;type=application/pdf")" 201
+          curl -s -o "$PASTA/baixado.pdf" $URL/empresas/1/documentos/1/arquivo
+          esperar "Arquivo baixado é igual ao enviado" "$(cmp -s "$PASTA/cartao.pdf" "$PASTA/baixado.pdf" && echo ok)" ok
+          esperar "Remoção de anexo retorna 200" "$(status -X DELETE $URL/empresas/1/documentos/1 -H "$J" -H "$U" -d '{"motivo":"Teste da CI"}')" 200
+          esperar "Restauração de anexo retorna 200" "$(status -X POST $URL/empresas/1/documentos/1/restaurar -H "$U")" 200
+          esperar "Histórico da empresa inclui os anexos" "$(curl -s $URL/empresas/1/historico | grep -o '"acao"' | wc -l)" 7
 
-          echo "→ Pessoa inválida retorna 400"
-          test "$(curl -s -o /dev/null -w '%{http_code}' -X POST $URL/api/pessoas -H "$H" -d '{"nome":"X"}')" = 400
-
-          echo "→ Cadastro de pessoa válida retorna 201"
-          test "$(curl -s -o /dev/null -w '%{http_code}' -X POST $URL/api/pessoas -H "$H" \
-            -d '{"nome":"Maria da Silva","cpf":"12345678909","email":"maria@email.com","telefone":"31999990000","dataNascimento":"1995-04-20","profissao":"QA"}')" = 201
+          esperar "Pessoa inválida retorna 400" "$(status -X POST $URL/pessoas -H "$J" -H "$U" -d '{"nome":"X"}')" 400
+          esperar "Pessoa vinculada à empresa retorna 201" "$(status -X POST $URL/pessoas -H "$J" -H "$U" \
+            -d '{"nome":"Maria da Silva","cpf":"12345678909","email":"maria@email.com","telefone":"31999990000","dataNascimento":"1995-04-20","profissao":"QA","empresaId":1}')" 201
 
           echo "✅ Todos os testes passaram"
 

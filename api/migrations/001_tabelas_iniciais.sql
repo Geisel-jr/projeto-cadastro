@@ -1,4 +1,4 @@
--- Script executado automaticamente pelo container do PostgreSQL na primeira vez que ele sobe.
+-- Migração 001: tabelas iniciais do sistema.
 -- Documentos (CPF, CNPJ, CEP, telefone) são armazenados apenas com números.
 
 CREATE TABLE IF NOT EXISTS empresas (

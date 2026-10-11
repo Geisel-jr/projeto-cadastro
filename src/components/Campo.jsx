@@ -1,8 +1,8 @@
 // Campo de formulário com label, mensagem de erro e texto de ajuda.
-export default function Campo({ label, obrigatorio, erro, ajuda, children, className = '' }) {
+export default function Campo({ id, label, obrigatorio, erro, ajuda, children, className = '' }) {
   return (
     <div className={`campo ${className}`}>
-      <label className="form-label">
+      <label className="form-label" htmlFor={id}>
         {label} {obrigatorio && <span className="text-danger">*</span>}
       </label>
       {children}
