@@ -1,6 +1,6 @@
 const express = require('express');
 const cors = require('cors');
-require('dotenv').config();
+require('dotenv').config({ quiet: true });
 
 const { pool, migrar } = require('./db');
 const rotasCadastro = require('./cadastros');

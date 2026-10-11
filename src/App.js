@@ -18,6 +18,9 @@ const MENU = [
   { id: 'auditoria', label: 'Auditoria', icone: 'escudo', rota: { pagina: 'auditoria' } },
 ];
 
+const DURACAO_AVISO = 4500;
+const DURACAO_SAIDA = 150; // igual à animação "sair-toast" do CSS
+
 function App() {
   // rota = { pagina: 'painel' | 'lista' | 'form' | 'auditoria', entidade?, id? }
   const [rota, setRota] = useState({ pagina: 'painel' });
@@ -25,15 +28,16 @@ function App() {
   const [trocandoOperador, setTrocandoOperador] = useState(false);
   const [notificacoes, setNotificacoes] = useState([]);
 
+  // Marca o aviso como "saindo" (anima) e depois o remove
   const fecharNotificacao = useCallback((id) => {
-    setNotificacoes((lista) => lista.filter((n) => n.id !== id));
+    setNotificacoes((lista) => lista.map((n) => (n.id === id ? { ...n, saindo: true } : n)));
+    setTimeout(() => setNotificacoes((lista) => lista.filter((n) => n.id !== id)), DURACAO_SAIDA);
   }, []);
 
-  // Mostra um aviso no canto da tela que some sozinho depois de 4s
   const notificar = useCallback((tipo, titulo, mensagem) => {
     const id = Date.now() + Math.random();
     setNotificacoes((lista) => [...lista, { id, tipo, titulo, mensagem }]);
-    setTimeout(() => fecharNotificacao(id), 4000);
+    setTimeout(() => fecharNotificacao(id), DURACAO_AVISO);
   }, [fecharNotificacao]);
 
   const navegar = useCallback((novaRota) => {
@@ -52,7 +56,7 @@ function App() {
   const menuAtivo = rota.entidade || rota.pagina;
 
   return (
-    <div className="app">
+    <>
       <header className="topbar">
         <div className="container topbar-inner">
           <button className="marca" onClick={() => navegar({ pagina: 'painel' })}>
@@ -67,8 +71,9 @@ function App() {
                 className={`menu-item ${menuAtivo === item.id ? 'ativo' : ''}`}
                 onClick={() => navegar(item.rota)}
                 title={item.label}
+                aria-current={menuAtivo === item.id ? 'page' : undefined}
               >
-                <Icone nome={item.icone} tamanho={17} />
+                <Icone nome={item.icone} tamanho={16} />
                 <span>{item.label}</span>
               </button>
             ))}
@@ -76,8 +81,8 @@ function App() {
 
           {operador && (
             <button className="operador" onClick={() => setTrocandoOperador(true)} title="Trocar operador">
-              <span className="avatar cinza pequeno">{iniciais(operador)}</span>
-              <span className="operador-nome">{operador}</span>
+              <span className="avatar pequeno">{iniciais(operador)}</span>
+              <span className="operador-nome truncar">{operador}</span>
             </button>
           )}
         </div>
@@ -101,7 +106,7 @@ function App() {
       )}
 
       <Notificacoes itens={notificacoes} onFechar={fecharNotificacao} />
-    </div>
+    </>
   );
 }
 

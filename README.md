@@ -58,7 +58,7 @@ O painel web do MinIO fica em http://localhost:9001 (usuário `minioadmin`, senh
 
 | Camada | Tecnologia |
 | --- | --- |
-| Front-end | React 19, Bootstrap 5, CSS próprio |
+| Front-end | React 19, CSS próprio (sem framework de UI) |
 | API | Node.js, Express 5, `pg` |
 | Banco | PostgreSQL 16 |
 | Arquivos | MinIO (compatível com S3), `minio` e `multer` na API |

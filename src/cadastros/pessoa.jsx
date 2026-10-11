@@ -12,8 +12,6 @@ const pessoa = {
   singular: 'pessoa',
   plural: 'Pessoas',
   novo: 'Nova pessoa',
-  icone: 'pessoa',
-  cor: 'verde',
   nomeExibicao: (r) => r?.nomeSocial || r?.nome || '—',
 
   abas: [
@@ -45,7 +43,6 @@ const pessoa = {
         { nome: 'email', max: 150, label: 'E-mail', tipo: 'email', obrigatorio: true, col: 6 },
         { nome: 'telefone', label: 'Telefone', tipo: 'telefone', obrigatorio: true, col: 3 },
         { nome: 'celular', label: 'Celular / WhatsApp', tipo: 'telefone', col: 3 },
-        { secao: 'Endereço' },
         ...camposEndereco(),
       ],
     },

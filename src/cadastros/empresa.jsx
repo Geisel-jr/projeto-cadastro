@@ -7,8 +7,6 @@ const empresa = {
   singular: 'empresa',
   plural: 'Empresas',
   novo: 'Nova empresa',
-  icone: 'empresa',
-  cor: 'azul',
   documentos: true, // mostra o painel de documentos (anexos no MinIO) no formulário
   nomeExibicao: (r) => r?.nomeFantasia || r?.nome || '—',
 
@@ -23,7 +21,6 @@ const empresa = {
           tipo: 'cnpj',
           obrigatorio: true,
           col: 4,
-          ajuda: 'Os dados são buscados na Receita Federal.',
           completar: { tamanho: 14, buscar: buscarCNPJ, apenasVazios: true },
         },
         { nome: 'nome', max: 150, label: 'Razão social', obrigatorio: true, col: 8 },
@@ -39,11 +36,10 @@ const empresa = {
       id: 'contato',
       titulo: 'Contato e endereço',
       campos: [
-        { nome: 'email', max: 150, label: 'E-mail', tipo: 'email', obrigatorio: true, col: 6, placeholder: 'contato@empresa.com.br' },
-        { nome: 'site', max: 200, label: 'Site', col: 6, placeholder: 'www.empresa.com.br' },
+        { nome: 'email', max: 150, label: 'E-mail', tipo: 'email', obrigatorio: true, col: 6 },
+        { nome: 'site', max: 200, label: 'Site', col: 6 },
         { nome: 'telefone', label: 'Telefone', tipo: 'telefone', obrigatorio: true, col: 3 },
         { nome: 'celular', label: 'Celular / WhatsApp', tipo: 'telefone', col: 3 },
-        { secao: 'Endereço' },
         ...camposEndereco({ cepObrigatorio: true }),
       ],
     },
@@ -83,7 +79,7 @@ const empresa = {
       titulo: 'Documentos',
       render: (e) => (
         <div className="celula-dupla">
-          <span className="tabular">{e.totalDocumentos ?? 0} anexo(s)</span>
+          <span>{e.totalDocumentos ?? 0} anexo(s)</span>
           {e.faltaCartaoCnpj && <small className="texto-alerta">Falta o cartão CNPJ</small>}
         </div>
       ),

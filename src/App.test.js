@@ -18,12 +18,12 @@ beforeEach(() => {
 
 test('pede a identificação do operador no primeiro acesso', async () => {
   render(<App />);
-  expect(screen.getByText('Identificação do operador')).toBeInTheDocument();
+  expect(screen.getByText('Quem está usando o sistema?')).toBeInTheDocument();
 
   fireEvent.change(screen.getByLabelText(/seu nome/i), { target: { value: 'Ana Souza' } });
   fireEvent.click(screen.getByRole('button', { name: 'Confirmar' }));
 
-  expect(screen.queryByText('Identificação do operador')).not.toBeInTheDocument();
+  expect(screen.queryByText('Quem está usando o sistema?')).not.toBeInTheDocument();
   expect(screen.getByTitle('Trocar operador')).toHaveTextContent('Ana Souza');
   expect(await screen.findByText('Nenhuma ação registrada.')).toBeInTheDocument();
 });

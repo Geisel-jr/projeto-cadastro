@@ -17,15 +17,12 @@ export default function Painel({ onNavegar }) {
       .catch((e) => setErro(mensagemErro(e)));
   }, []);
 
-  const abrirRegistro = (entidade, id) => onNavegar({ pagina: 'form', entidade, id });
-
   const cards = [
     {
       titulo: 'Empresas ativas',
       valor: resumo?.empresas,
       detalhe: resumo && `${resumo.empresasExcluidas} excluída(s)`,
       icone: 'empresa',
-      cor: 'azul',
       rota: { pagina: 'lista', entidade: 'empresas' },
     },
     {
@@ -33,15 +30,12 @@ export default function Painel({ onNavegar }) {
       valor: resumo?.pessoas,
       detalhe: resumo && `${resumo.pessoasExcluidas} excluída(s)`,
       icone: 'pessoa',
-      cor: 'verde',
       rota: { pagina: 'lista', entidade: 'pessoas' },
     },
     {
       titulo: 'Ações nas últimas 24h',
       valor: resumo?.acoesDia,
-      detalhe: 'Ver auditoria completa',
       icone: 'escudo',
-      cor: 'roxo',
       rota: { pagina: 'auditoria' },
     },
   ];
@@ -55,37 +49,33 @@ export default function Painel({ onNavegar }) {
       {erro && (
         <div className="aviso aviso-erro">
           <Icone nome="alerta" />
-          <span>{erro} Verifique se a API está rodando.</span>
+          <span className="aviso-texto">{erro}</span>
         </div>
       )}
 
-      <div className="row g-3 mb-3">
+      <div className="cards">
         {cards.map((card) => (
-          <div className="col-md-4" key={card.titulo}>
-            <button className="card-stat" onClick={() => onNavegar(card.rota)}>
-              <span className={`stat-icone ${card.cor}`}><Icone nome={card.icone} tamanho={22} /></span>
-              <div className="text-start">
-                <span className="stat-label">{card.titulo}</span>
-                <span className="stat-valor">{card.valor ?? '—'}</span>
-                <span className="stat-detalhe">{card.detalhe}</span>
-              </div>
-            </button>
-          </div>
+          <button className="card-stat" key={card.titulo} onClick={() => onNavegar(card.rota)}>
+            <span className="stat-icone"><Icone nome={card.icone} tamanho={18} /></span>
+            <span>
+              <span className="stat-label">{card.titulo}</span>
+              <span className="stat-valor">{card.valor ?? '—'}</span>
+              {card.detalhe && <span className="stat-detalhe">{card.detalhe}</span>}
+            </span>
+          </button>
         ))}
       </div>
 
       <div className="painel">
         <div className="painel-header">
           <h2>Atividade recente</h2>
-          <button className="btn btn-link btn-sm text-decoration-none" onClick={() => onNavegar({ pagina: 'auditoria' })}>
-            Ver tudo
-          </button>
+          <button className="btn-texto" onClick={() => onNavegar({ pagina: 'auditoria' })}>Ver tudo</button>
         </div>
         <div className="painel-corpo">
           {atividades ? (
-            <Historico itens={atividades} mostrarRegistro onAbrir={abrirRegistro} />
+            <Historico itens={atividades} mostrarRegistro onAbrir={(entidade, id) => onNavegar({ pagina: 'form', entidade, id })} />
           ) : !erro && (
-            <div className="estado"><div className="spinner-border text-primary" /></div>
+            <div className="carregando"><span className="spinner" /></div>
           )}
         </div>
       </div>

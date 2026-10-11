@@ -3,14 +3,11 @@ import { mensagemErro } from '../api';
 import Campo from './Campo';
 import Modal from './Modal';
 
-const AVISO_PADRAO = 'O registro sai das listagens, mas continua guardado e pode ser restaurado em "Excluídos". '
-  + 'A ação fica registrada na auditoria.';
-
 // Confirmação de exclusão. O motivo é obrigatório e fica registrado na auditoria.
 export default function ModalExclusao({
   titulo = 'Excluir registro',
   descricao,
-  aviso = AVISO_PADRAO,
+  aviso = 'Poderá ser restaurado depois.',
   botao = 'Excluir',
   onConfirmar,
   onFechar,
@@ -38,23 +35,24 @@ export default function ModalExclusao({
     <Modal
       titulo={titulo}
       onFechar={enviando ? undefined : onFechar}
-      rodape={
+      rodape={(fechar) => (
         <>
-          <button className="btn btn-outline-secondary" onClick={onFechar} disabled={enviando}>Cancelar</button>
-          <button className="btn btn-danger" type="submit" form="form-exclusao" disabled={enviando}>
+          <button className="btn btn-secundario" onClick={fechar} disabled={enviando}>Cancelar</button>
+          <button className="btn btn-perigo" type="submit" form="form-exclusao" disabled={enviando}>
+            {enviando && <span className="spinner" />}
             {enviando ? 'Aguarde...' : botao}
           </button>
         </>
-      }
+      )}
     >
+      <p>{descricao} {aviso}</p>
       <form id="form-exclusao" onSubmit={confirmar}>
-        <p className="mb-2">{descricao}</p>
-        <p className="texto-suave small mb-3">{aviso}</p>
         <Campo id="motivo-exclusao" label="Motivo" obrigatorio erro={erro}>
           <textarea
             id="motivo-exclusao"
-            className={`form-control ${erro ? 'is-invalid' : ''}`}
+            className={`entrada ${erro ? 'invalida' : ''}`}
             rows={3}
+            maxLength={500}
             value={motivo}
             onChange={(e) => { setMotivo(e.target.value); setErro(null); }}
             autoFocus

@@ -15,7 +15,7 @@ function Validade({ data }) {
   const dias = diasAte(data);
   if (dias === null) return null;
   if (dias < 0) return <span className="selo perigo">Vencido em {formatarData(data)}</span>;
-  if (dias <= 30) return <span className="selo alerta">Vence em {dias === 0 ? 'hoje' : `${dias} dia(s)`}</span>;
+  if (dias <= 30) return <span className="selo alerta">Vence {dias === 0 ? 'hoje' : `em ${dias} dia(s)`}</span>;
   return <span className="selo">Válido até {formatarData(data)}</span>;
 }
 
@@ -24,31 +24,30 @@ export default function PainelDocumentos({ empresaId, bloqueado, notificar, onAl
   const [opcoes, setOpcoes] = useState(null); // tipos, extensões e tamanho máximo aceitos
   const [lista, setLista] = useState(null);
   const [removidos, setRemovidos] = useState(null); // null = seção fechada
-  const [envio, setEnvio] = useState(null); // { tipo, arquivo } quando o formulário está aberto
+  const [envio, setEnvio] = useState(null); // { tipo, arquivo } com o formulário aberto
   const [removendo, setRemovendo] = useState(null);
   const [arrastando, setArrastando] = useState(false);
 
-  const carregar = useCallback(async () => {
+  const carregar = useCallback(async (incluirRemovidos) => {
     try {
       setLista(await apiDocumentos.listar(empresaId));
-      if (removidos) setRemovidos(await apiDocumentos.listar(empresaId, 'excluidos'));
+      if (incluirRemovidos) setRemovidos(await apiDocumentos.listar(empresaId, 'excluidos'));
     } catch (e) {
       setLista([]);
       notificar('erro', 'Erro ao carregar documentos', mensagemErro(e));
     }
-  }, [empresaId, removidos, notificar]);
+  }, [empresaId, notificar]);
 
   useEffect(() => {
     apiDocumentos.tipos().then(setOpcoes).catch(() => {});
   }, []);
 
   useEffect(() => {
-    if (empresaId) carregar();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [empresaId]);
+    if (empresaId) carregar(false);
+  }, [empresaId, carregar]);
 
   const aposAlterar = async () => {
-    await carregar();
+    await carregar(Boolean(removidos));
     onAlterar?.();
   };
 
@@ -101,17 +100,14 @@ export default function PainelDocumentos({ empresaId, bloqueado, notificar, onAl
           {lista?.length > 0 && <span className="contador">{lista.length}</span>}
         </h2>
         {podeEnviar && !envio && (
-          <button className="btn btn-sm btn-outline-secondary" onClick={() => setEnvio({ tipo: TIPO_PADRAO })}>
+          <button className="btn btn-secundario btn-pequeno" onClick={() => setEnvio({ tipo: TIPO_PADRAO })}>
             <Icone nome="anexo" tamanho={15} /> Anexar
           </button>
         )}
       </div>
 
       {!empresaId ? (
-        <div className="documentos-vazio">
-          <Icone nome="arquivo" tamanho={22} />
-          <p>Salve a empresa para anexar documentos como o cartão CNPJ e o contrato social.</p>
-        </div>
+        <p className="vazio">Disponível após salvar.</p>
       ) : (
         <>
           {envio && opcoes && (
@@ -132,19 +128,19 @@ export default function PainelDocumentos({ empresaId, bloqueado, notificar, onAl
           {faltaCartao && !envio && podeEnviar && (
             <button className="documento-pendente" onClick={() => setEnvio({ tipo: TIPO_PADRAO })}>
               <span className="doc-icone pendente"><Icone nome="upload" tamanho={16} /></span>
-              <span className="flex-grow-1 text-start">
+              <span>
                 <strong>Cartão CNPJ</strong>
-                <small>Pendente · clique ou arraste o arquivo aqui</small>
+                <small>Pendente</small>
               </span>
             </button>
           )}
 
           {lista === null ? (
-            <div className="p-3"><div className="esq texto" /><div className="esq texto curto mt-2" /></div>
+            <div className="painel-corpo"><span className="esq" /><span className="esq curto" /></div>
           ) : lista.length === 0 && !faltaCartao ? (
-            <p className="texto-suave small text-center py-4 mb-0">Nenhum documento anexado.</p>
+            <p className="vazio">Nenhum documento.</p>
           ) : (
-            <ul className="lista-documentos">
+            <ul>
               {lista.map((doc) => (
                 <ItemDocumento
                   key={doc.id}
@@ -160,14 +156,11 @@ export default function PainelDocumentos({ empresaId, bloqueado, notificar, onAl
             </ul>
           )}
 
-          <button className="link-removidos" onClick={alternarRemovidos}>
-            {removidos ? 'Ocultar removidos' : 'Ver documentos removidos'}
-          </button>
           {removidos && (
             removidos.length === 0 ? (
-              <p className="texto-suave small text-center pb-3 mb-0">Nenhum documento removido.</p>
+              <p className="vazio">Nenhum documento removido.</p>
             ) : (
-              <ul className="lista-documentos removidos">
+              <ul className="removidos">
                 {removidos.map((doc) => (
                   <ItemDocumento
                     key={doc.id}
@@ -183,14 +176,16 @@ export default function PainelDocumentos({ empresaId, bloqueado, notificar, onAl
               </ul>
             )
           )}
+          <button className="link-removidos" onClick={alternarRemovidos}>
+            {removidos ? 'Ocultar removidos' : 'Ver removidos'}
+          </button>
         </>
       )}
 
       {removendo && (
         <ModalExclusao
           titulo="Remover documento"
-          descricao={<>Remover <strong>{nomeDocumento(removendo)}</strong> ({removendo.nomeArquivo})?</>}
-          aviso="O arquivo continua guardado e pode ser restaurado em &quot;Ver documentos removidos&quot;. A ação fica registrada no histórico da empresa."
+          descricao={<>Remover <strong>{nomeDocumento(removendo)}</strong>?</>}
           botao="Remover"
           onConfirmar={remover}
           onFechar={() => setRemovendo(null)}
@@ -207,13 +202,15 @@ function ItemDocumento({ doc, empresaId, acao }) {
       <span className={`doc-icone ${ext}`}>{ROTULO_ARQUIVO[ext] || 'ARQ'}</span>
       <div className="doc-info">
         <strong>{nomeDocumento(doc)}</strong>
-        {doc.tipo !== 'Outros' && doc.descricao && <span className="doc-descricao">{doc.descricao}</span>}
-        <small title={doc.nomeArquivo}>{doc.nomeArquivo} · {formatarTamanho(doc.tamanho)}</small>
-        <small>
-          {doc.excluidoEm
-            ? `Removido por ${doc.excluidoPor} · ${doc.motivoExclusao}`
-            : `${doc.criadoPor} · ${new Date(doc.criadoEm).toLocaleDateString('pt-BR')}`}
-        </small>
+        {doc.tipo !== 'Outros' && doc.descricao && <span className="doc-descricao truncar" title={doc.descricao}>{doc.descricao}</span>}
+        <small className="truncar" title={doc.nomeArquivo}>{doc.nomeArquivo} · {formatarTamanho(doc.tamanho)}</small>
+        {doc.excluidoEm ? (
+          <small className="limite-linhas" title={doc.motivoExclusao}>
+            Removido por {doc.excluidoPor}: {doc.motivoExclusao}
+          </small>
+        ) : (
+          <small className="truncar">{doc.criadoPor} · {new Date(doc.criadoEm).toLocaleDateString('pt-BR')}</small>
+        )}
         {!doc.excluidoEm && doc.validade && <Validade data={doc.validade} />}
       </div>
       <div className="doc-acoes">
@@ -274,8 +271,8 @@ function FormularioEnvio({ empresaId, opcoes, inicial, notificar, onCancelar, on
 
   return (
     <form className="form-envio" onSubmit={enviar} noValidate>
-      <Campo id="doc-tipo" label="Tipo de documento" obrigatorio erro={erros.tipo}>
-        <select id="doc-tipo" className="form-select" value={tipo} onChange={(e) => setTipo(e.target.value)} disabled={enviando}>
+      <Campo id="doc-tipo" label="Tipo" obrigatorio erro={erros.tipo}>
+        <select id="doc-tipo" className="entrada" value={tipo} onChange={(e) => setTipo(e.target.value)} disabled={enviando}>
           {opcoes.tipos.map((t) => <option key={t} value={t}>{t}</option>)}
         </select>
       </Campo>
@@ -288,17 +285,16 @@ function FormularioEnvio({ empresaId, opcoes, inicial, notificar, onCancelar, on
       >
         <input
           id="doc-descricao"
-          className={`form-control ${erros.descricao ? 'is-invalid' : ''}`}
+          className={`entrada ${erros.descricao ? 'invalida' : ''}`}
           value={descricao}
           maxLength={150}
-          placeholder={tipo === 'Outros' ? 'Ex: Balanço patrimonial 2025' : 'Opcional'}
           onChange={(e) => { setDescricao(e.target.value); setErros((x) => ({ ...x, descricao: undefined })); }}
           disabled={enviando}
         />
       </Campo>
 
-      <Campo id="doc-validade" label="Validade" ajuda="Para certidões e alvarás.">
-        <input id="doc-validade" type="date" className="form-control" value={validade}
+      <Campo id="doc-validade" label="Validade">
+        <input id="doc-validade" type="date" className="entrada" value={validade}
           onChange={(e) => setValidade(e.target.value)} disabled={enviando} />
       </Campo>
 
@@ -318,9 +314,9 @@ function FormularioEnvio({ empresaId, opcoes, inicial, notificar, onCancelar, on
           />
           <Icone nome={arquivo ? 'arquivo' : 'upload'} tamanho={20} />
           {arquivo ? (
-            <span><strong>{arquivo.name}</strong><small>{formatarTamanho(arquivo.size)} · clique para trocar</small></span>
+            <span><strong className="truncar">{arquivo.name}</strong><small>{formatarTamanho(arquivo.size)} · trocar</small></span>
           ) : (
-            <span><strong>Escolha ou arraste um arquivo</strong><small>PDF, imagem, DOCX ou XLSX até {formatarTamanho(opcoes.tamanhoMaximo)}</small></span>
+            <span><strong>Escolha ou arraste</strong><small>PDF, imagem, DOCX ou XLSX · até {formatarTamanho(opcoes.tamanhoMaximo)}</small></span>
           )}
         </label>
         {erros.arquivo && <div className="campo-erro">{erros.arquivo}</div>}
@@ -332,9 +328,9 @@ function FormularioEnvio({ empresaId, opcoes, inicial, notificar, onCancelar, on
         </div>
       )}
 
-      <div className="d-flex gap-2 justify-content-end">
-        <button type="button" className="btn btn-sm btn-outline-secondary" onClick={onCancelar} disabled={enviando}>Cancelar</button>
-        <button type="submit" className="btn btn-sm btn-primary" disabled={enviando}>
+      <div className="botoes">
+        <button type="button" className="btn btn-secundario btn-pequeno" onClick={onCancelar} disabled={enviando}>Cancelar</button>
+        <button type="submit" className="btn btn-primario btn-pequeno" disabled={enviando}>
           {enviando ? `Enviando ${Math.round(progresso * 100)}%` : 'Enviar'}
         </button>
       </div>

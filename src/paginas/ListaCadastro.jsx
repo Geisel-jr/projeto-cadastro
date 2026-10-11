@@ -5,27 +5,14 @@ import ModalExclusao from '../components/ModalExclusao';
 import { formatarDataHora } from '../utils/formatadores';
 
 // Listagem de um cadastro, com busca, filtro Ativos/Excluídos e ações por linha.
-export default function ListaCadastro({ config, statusInicial = 'ativos', onNavegar, notificar }) {
-  const [status, setStatus] = useState(statusInicial);
+export default function ListaCadastro({ config, onNavegar, notificar }) {
+  const [status, setStatus] = useState('ativos');
   const [itens, setItens] = useState([]);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState(null);
   const [filtro, setFiltro] = useState('');
   const [excluindo, setExcluindo] = useState(null);
   const campoBusca = useRef(null);
-
-  // "/" leva o cursor para a busca (atalho comum em sistemas web)
-  useEffect(() => {
-    const aoTeclar = (e) => {
-      const digitando = ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName);
-      if (e.key === '/' && !digitando) {
-        e.preventDefault();
-        campoBusca.current?.focus();
-      }
-    };
-    window.addEventListener('keydown', aoTeclar);
-    return () => window.removeEventListener('keydown', aoTeclar);
-  }, []);
 
   const carregar = useCallback(async () => {
     setCarregando(true);
@@ -43,6 +30,19 @@ export default function ListaCadastro({ config, statusInicial = 'ativos', onNave
     carregar();
   }, [carregar]);
 
+  // "/" leva o cursor para a busca
+  useEffect(() => {
+    const aoTeclar = (e) => {
+      const digitando = ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName);
+      if (e.key === '/' && !digitando) {
+        e.preventDefault();
+        campoBusca.current?.focus();
+      }
+    };
+    window.addEventListener('keydown', aoTeclar);
+    return () => window.removeEventListener('keydown', aoTeclar);
+  }, []);
+
   const filtrados = useMemo(() => {
     const termo = filtro.trim().toLowerCase();
     if (!termo) return itens;
@@ -59,7 +59,7 @@ export default function ListaCadastro({ config, statusInicial = 'ativos', onNave
 
   const excluir = async (motivo) => {
     await api.excluir(config.entidade, excluindo.id, motivo);
-    notificar('sucesso', 'Registro excluído', `${config.nomeExibicao(excluindo)} foi movido para Excluídos.`);
+    notificar('sucesso', 'Registro excluído', config.nomeExibicao(excluindo));
     setExcluindo(null);
     carregar();
   };
@@ -67,7 +67,7 @@ export default function ListaCadastro({ config, statusInicial = 'ativos', onNave
   const restaurar = async (item) => {
     try {
       await api.restaurar(config.entidade, item.id);
-      notificar('sucesso', 'Registro restaurado', `${config.nomeExibicao(item)} voltou para os ativos.`);
+      notificar('sucesso', 'Registro restaurado', config.nomeExibicao(item));
       carregar();
     } catch (e) {
       notificar('erro', 'Não foi possível restaurar', mensagemErro(e));
@@ -76,113 +76,124 @@ export default function ListaCadastro({ config, statusInicial = 'ativos', onNave
 
   const verExcluidos = status === 'excluidos';
 
+  // Nos excluídos, quem excluiu e o motivo aparecem logo depois do nome
+  const colunaExclusao = {
+    titulo: 'Exclusão',
+    render: (item) => (
+      <div className="celula-dupla celula-motivo">
+        <span>{item.excluidoPor} · {formatarDataHora(item.excluidoEm)}</span>
+        <small title={item.motivoExclusao}>{item.motivoExclusao}</small>
+      </div>
+    ),
+  };
+  const colunas = verExcluidos
+    ? [config.colunas[0], colunaExclusao, ...config.colunas.slice(1)]
+    : config.colunas;
+
+  let conteudo;
+  if (carregando) {
+    conteudo = (
+      <div className="esqueleto" aria-label="Carregando">
+        {[62, 48, 70, 55, 40].map((largura, i) => (
+          <div className="esqueleto-linha" key={i}>
+            <span className="esq circulo" />
+            <span className="esq" style={{ width: `${largura}%` }} />
+          </div>
+        ))}
+      </div>
+    );
+  } else if (erro) {
+    conteudo = (
+      <div className="estado">
+        <span className="estado-icone erro"><Icone nome="alerta" tamanho={24} /></span>
+        <p>{erro}</p>
+        <button className="btn btn-secundario btn-pequeno" onClick={carregar}>Tentar novamente</button>
+      </div>
+    );
+  } else if (filtrados.length === 0) {
+    conteudo = (
+      <div className="estado">
+        <span className="estado-icone"><Icone nome="vazio" tamanho={24} /></span>
+        <p>{itens.length > 0 ? 'Nenhum resultado.' : verExcluidos ? 'Nenhum registro excluído.' : 'Nenhum cadastro ainda.'}</p>
+      </div>
+    );
+  } else {
+    conteudo = (
+      <div className="rolagem-x">
+        <table className="tabela">
+          <thead>
+            <tr>
+              {colunas.map((c) => <th key={c.titulo}>{c.titulo}</th>)}
+              <th className="coluna-acoes"><span className="visualmente-oculto">Ações</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            {filtrados.map((item) => (
+              <tr key={item.id} onClick={() => abrir(item)} className="linha-clicavel">
+                {colunas.map((c) => <td key={c.titulo}>{c.render(item)}</td>)}
+                <td className="coluna-acoes" onClick={(e) => e.stopPropagation()}>
+                  <div className="acoes">
+                    {verExcluidos ? (
+                      <button className="btn-acao" onClick={() => restaurar(item)} title="Restaurar" aria-label="Restaurar">
+                        <Icone nome="restaurar" tamanho={17} />
+                      </button>
+                    ) : (
+                      <>
+                        <button className="btn-acao" onClick={() => abrir(item)} title="Editar" aria-label="Editar">
+                          <Icone nome="editar" tamanho={17} />
+                        </button>
+                        <button className="btn-acao perigo" onClick={() => setExcluindo(item)} title="Excluir" aria-label="Excluir">
+                          <Icone nome="lixeira" tamanho={17} />
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    );
+  }
+
   return (
     <>
       <div className="page-header">
         <h1 className="page-title">{config.plural}</h1>
-        <button className="btn btn-primary" onClick={() => onNavegar({ pagina: 'form', entidade: config.entidade })}>
-          <Icone nome="mais" /> {config.novo}
+        <button className="btn btn-primario" onClick={() => onNavegar({ pagina: 'form', entidade: config.entidade })}>
+          <Icone nome="mais" tamanho={16} /> {config.novo}
         </button>
       </div>
 
       <div className="painel">
         <div className="tabela-toolbar">
           <div className="busca">
-            <Icone nome="busca" tamanho={17} />
+            <Icone nome="busca" tamanho={16} />
             <input
               ref={campoBusca}
-              className="form-control"
-              placeholder="Buscar por nome, documento, e-mail..."
+              className="entrada"
+              placeholder="Buscar..."
+              aria-label="Buscar"
               value={filtro}
               onChange={(e) => setFiltro(e.target.value)}
             />
             <kbd className="atalho">/</kbd>
           </div>
 
-          <div className="segmentado" role="group" aria-label="Filtrar por situação">
+          <div className="segmentado" role="group" aria-label="Situação">
             <button className={!verExcluidos ? 'ativo' : ''} onClick={() => setStatus('ativos')}>Ativos</button>
             <button className={verExcluidos ? 'ativo' : ''} onClick={() => setStatus('excluidos')}>Excluídos</button>
           </div>
 
-          <span className="texto-suave small ms-auto">
-            {!carregando && !erro && `${filtrados.length} de ${itens.length}`}
-          </span>
-          <button className="btn-icone" onClick={carregar} title="Atualizar" aria-label="Atualizar">
-            <Icone nome="atualizar" tamanho={17} />
-          </button>
+          <div className="toolbar-fim">
+            {!carregando && !erro && <span>{filtrados.length} de {itens.length}</span>}
+            <button className="btn-icone" onClick={carregar} title="Atualizar" aria-label="Atualizar">
+              <Icone nome="atualizar" tamanho={16} />
+            </button>
+          </div>
         </div>
-
-        {carregando ? (
-          <div className="esqueleto" aria-label="Carregando">
-            {[62, 48, 70, 55, 40].map((largura, i) => (
-              <div className="esqueleto-linha" key={i}>
-                <span className="esq circulo" />
-                <span className="esq texto" style={{ width: `${largura}%` }} />
-              </div>
-            ))}
-          </div>
-        ) : erro ? (
-          <div className="estado">
-            <span className="estado-icone erro"><Icone nome="alerta" tamanho={28} /></span>
-            <p>{erro}</p>
-            <button className="btn btn-outline-primary btn-sm" onClick={carregar}>Tentar novamente</button>
-          </div>
-        ) : filtrados.length === 0 ? (
-          <div className="estado">
-            <span className="estado-icone"><Icone nome="vazio" tamanho={28} /></span>
-            <p>
-              {itens.length > 0 ? 'Nenhum resultado para a busca.'
-                : verExcluidos ? 'Nenhum registro excluído.' : `Nenhum${config.singular === 'empresa' ? 'a empresa cadastrada' : 'a pessoa cadastrada'}.`}
-            </p>
-          </div>
-        ) : (
-          <div className="table-responsive">
-            <table className="table tabela mb-0">
-              <thead>
-                <tr>
-                  {config.colunas.map((c) => <th key={c.titulo}>{c.titulo}</th>)}
-                  {verExcluidos && <th>Exclusão</th>}
-                  <th className="text-end">Ações</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtrados.map((item) => (
-                  <tr key={item.id} onClick={() => abrir(item)} className="linha-clicavel">
-                    {config.colunas.map((c) => <td key={c.titulo}>{c.render(item)}</td>)}
-                    {verExcluidos && (
-                      <td>
-                        <div className="celula-dupla">
-                          <span>{item.excluidoPor} · {formatarDataHora(item.excluidoEm)}</span>
-                          <small className="text-truncate d-block" style={{ maxWidth: 220 }} title={item.motivoExclusao}>
-                            {item.motivoExclusao}
-                          </small>
-                        </div>
-                      </td>
-                    )}
-                    <td className="text-end" onClick={(e) => e.stopPropagation()}>
-                      <div className="acoes">
-                        {verExcluidos ? (
-                          <button className="btn-acao" onClick={() => restaurar(item)} title="Restaurar">
-                            <Icone nome="restaurar" tamanho={17} />
-                          </button>
-                        ) : (
-                          <>
-                            <button className="btn-acao" onClick={() => abrir(item)} title="Editar">
-                              <Icone nome="editar" tamanho={17} />
-                            </button>
-                            <button className="btn-acao perigo" onClick={() => setExcluindo(item)} title="Excluir">
-                              <Icone nome="lixeira" tamanho={17} />
-                            </button>
-                          </>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+        {conteudo}
       </div>
 
       {excluindo && (

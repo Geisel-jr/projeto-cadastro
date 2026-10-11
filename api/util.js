@@ -44,4 +44,12 @@ class ErroHttp extends Error {
   }
 }
 
-module.exports = { paraSnake, paraCamel, linhaParaObjeto, emTransacao, registrarAuditoria, ErroHttp };
+// Motivo obrigatório de exclusões e remoções (3 a 500 caracteres)
+function lerMotivo(corpo) {
+  const motivo = String(corpo?.motivo ?? '').trim();
+  if (motivo.length < 3) throw new ErroHttp(400, 'Informe o motivo.', { motivo: 'Informe o motivo (mínimo 3 caracteres).' });
+  if (motivo.length > 500) throw new ErroHttp(400, 'Motivo muito longo.', { motivo: 'Máximo de 500 caracteres.' });
+  return motivo;
+}
+
+module.exports = { paraSnake, paraCamel, linhaParaObjeto, emTransacao, registrarAuditoria, lerMotivo, ErroHttp };

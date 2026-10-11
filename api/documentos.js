@@ -3,7 +3,7 @@ const path = require('path');
 const express = require('express');
 const multer = require('multer');
 const { enviarArquivo, lerArquivo, removerArquivo } = require('./storage');
-const { linhaParaObjeto, emTransacao, registrarAuditoria, ErroHttp } = require('./util');
+const { linhaParaObjeto, emTransacao, registrarAuditoria, lerMotivo, ErroHttp } = require('./util');
 
 // Tipos de documento oferecidos no cadastro. "Cartão CNPJ" é o padrão.
 const TIPOS_DOCUMENTO = [
@@ -152,10 +152,7 @@ function rotasDocumentos({ pool }) {
   router.delete('/:docId', async (req, res) => {
     const empresaId = lerId(req.params.empresaId);
     const docId = lerId(req.params.docId);
-    const motivo = String(req.body?.motivo ?? '').trim();
-    if (motivo.length < 3) {
-      throw new ErroHttp(400, 'Informe o motivo da remoção.', { motivo: 'Informe o motivo (mínimo 3 caracteres).' });
-    }
+    const motivo = lerMotivo(req.body);
 
     const documento = await emTransacao(pool, async (db) => {
       const antes = await buscarDocumento(db, empresaId, docId, true);

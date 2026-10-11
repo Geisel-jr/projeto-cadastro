@@ -18,18 +18,16 @@ export default function ModalOperador({ atual, onSalvar, onFechar }) {
 
   return (
     <Modal
-      titulo={atual ? 'Trocar operador' : 'Identificação do operador'}
+      titulo={atual ? 'Trocar operador' : 'Quem está usando o sistema?'}
       onFechar={onFechar}
-      rodape={<button className="btn btn-primary" type="submit" form="form-operador">Confirmar</button>}
+      rodape={<button className="btn btn-primario" type="submit" form="form-operador">Confirmar</button>}
     >
+      <p>Seu nome fica registrado em cada alteração.</p>
       <form id="form-operador" onSubmit={salvar}>
-        <p className="texto-suave small">
-          Todas as inclusões, alterações e exclusões ficam registradas na auditoria com o nome do operador.
-        </p>
         <Campo id="nome-operador" label="Seu nome" obrigatorio erro={erro}>
           <input
             id="nome-operador"
-            className={`form-control ${erro ? 'is-invalid' : ''}`}
+            className={`entrada ${erro ? 'invalida' : ''}`}
             value={nome}
             onChange={(e) => { setNome(e.target.value); setErro(null); }}
             maxLength={100}

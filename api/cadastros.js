@@ -1,6 +1,6 @@
 const express = require('express');
 const { validar } = require('./validacoes');
-const { paraSnake, linhaParaObjeto, emTransacao, registrarAuditoria, ErroHttp } = require('./util');
+const { paraSnake, linhaParaObjeto, emTransacao, registrarAuditoria, lerMotivo, ErroHttp } = require('./util');
 
 // Cria as rotas de um cadastro (empresas ou pessoas):
 //
@@ -112,10 +112,7 @@ function rotasCadastro({ pool, tabela, regras, consulta, verificar }) {
 
   router.delete('/:id', async (req, res) => {
     const id = lerId(req);
-    const motivo = String(req.body?.motivo ?? '').trim();
-    if (motivo.length < 3) {
-      throw new ErroHttp(400, 'Informe o motivo da exclusão.', { motivo: 'Informe o motivo da exclusão (mínimo 3 caracteres).' });
-    }
+    const motivo = lerMotivo(req.body);
 
     const registro = await emTransacao(pool, async (db) => {
       const antes = await buscarOuFalhar(db, id, true);

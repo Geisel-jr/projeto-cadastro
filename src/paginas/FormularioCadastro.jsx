@@ -188,14 +188,14 @@ export default function FormularioCadastro({ config, id, onNavegar, notificar })
   };
 
   if (carregando) {
-    return <div className="estado"><div className="spinner-border text-primary" /></div>;
+    return <div className="carregando"><span className="spinner" /></div>;
   }
   if (erroCarga) {
     return (
       <div className="estado">
-        <span className="estado-icone erro"><Icone nome="alerta" tamanho={28} /></span>
+        <span className="estado-icone erro"><Icone nome="alerta" tamanho={24} /></span>
         <p>{erroCarga}</p>
-        <button className="btn btn-outline-primary btn-sm" onClick={voltar}>Voltar para a lista</button>
+        <button className="btn btn-secundario btn-pequeno" onClick={voltar}>Voltar para a lista</button>
       </div>
     );
   }
@@ -210,8 +210,8 @@ export default function FormularioCadastro({ config, id, onNavegar, notificar })
       onChange: (e) => alterar(campo, e.target.value),
       disabled: excluido,
       'aria-invalid': Boolean(erro),
+      className: `entrada ${erro ? 'invalida' : ''}`,
     };
-    const invalido = erro ? 'is-invalid' : '';
     const listaOpcoes = campo.opcoes || tipo.opcoes || opcoes[campo.nome];
 
     let controle;
@@ -223,16 +223,16 @@ export default function FormularioCadastro({ config, id, onNavegar, notificar })
         itens.push({ valor: props.value, label: `${label} (indisponível)` });
       }
       controle = (
-        <select {...props} className={`form-select ${invalido}`}>
+        <select {...props}>
           <option value="">{campo.tipo === 'uf' ? '—' : 'Selecione...'}</option>
           {itens.map((o) => <option key={o.valor} value={o.valor}>{o.label}</option>)}
         </select>
       );
     } else if (campo.tipo === 'textarea') {
-      controle = <textarea {...props} rows={8} maxLength={campo.max} className={`form-control ${invalido}`} />;
+      controle = <textarea {...props} rows={8} maxLength={campo.max} />;
     } else {
       controle = (
-        <div className="position-relative">
+        <div className="campo-com-icone">
           <input
             {...props}
             type={tipo.input || 'text'}
@@ -240,9 +240,8 @@ export default function FormularioCadastro({ config, id, onNavegar, notificar })
             placeholder={campo.placeholder ?? tipo.placeholder}
             max={campo.tipo === 'data' ? hojeISO() : undefined}
             maxLength={campo.max}
-            className={`form-control ${invalido}`}
           />
-          {buscando === campo.nome && <span className="spinner-border spinner-border-sm input-spinner" />}
+          {buscando === campo.nome && <span className="spinner" />}
         </div>
       );
     }
@@ -255,8 +254,9 @@ export default function FormularioCadastro({ config, id, onNavegar, notificar })
         label={campo.label}
         obrigatorio={campo.obrigatorio}
         erro={erro}
-        ajuda={buscando === campo.nome ? 'Buscando dados...' : campo.ajuda}
-        className={`${col <= 3 ? 'col-6' : 'col-12'} col-md-${col}`}
+        ajuda={buscando === campo.nome ? 'Buscando dados...' : null}
+        col={col}
+        colCelular={col <= 3 ? 6 : 12}
       >
         {controle}
       </Campo>
@@ -271,45 +271,41 @@ export default function FormularioCadastro({ config, id, onNavegar, notificar })
   const abaAtual = abas.find((a) => a.id === aba);
 
   const formularioPrincipal = (
-    <form ref={formulario} onSubmit={salvar} noValidate className="painel painel-formulario">
+    <form ref={formulario} onSubmit={salvar} noValidate className="painel">
       <Abas abas={abas} ativa={aba} onTrocar={setAba} contadores={errosPorAba} />
 
       <div className="painel-corpo">
         {aba === 'historico' ? (
-          historico ? <Historico itens={historico} /> : <div className="estado"><div className="spinner-border spinner-border-sm" /></div>
+          historico ? <Historico itens={historico} /> : <div className="carregando"><span className="spinner" /></div>
         ) : (
-          <div className="row g-3" key={aba}>
-            {abaAtual.campos.map((campo, i) => {
-              if (campo.secao) return <div key={`secao-${i}`} className="col-12 secao-titulo">{campo.secao}</div>;
-              if (campo.visivel && !campo.visivel(dados)) return null;
-              return renderCampo(campo);
-            })}
+          <div className="grade" key={aba}>
+            {abaAtual.campos.map((campo) => (!campo.visivel || campo.visivel(dados) ? renderCampo(campo) : null))}
           </div>
         )}
       </div>
 
       <div className="form-rodape">
-        <small className="texto-suave meta">
+        <span className="form-rodape-meta">
           {edicao && (
             <>
               Criado por {registro.criadoPor || '—'} em {formatarDataHora(registro.criadoEm)}
               {registro.atualizadoEm && <> · Alterado por {registro.atualizadoPor} em {formatarDataHora(registro.atualizadoEm)}</>}
             </>
           )}
-        </small>
-        <div className="d-flex gap-2">
+        </span>
+        <div className="botoes">
           {excluido ? (
-            <button type="button" className="btn btn-outline-secondary" onClick={voltar}>Voltar</button>
+            <button type="button" className="btn btn-secundario" onClick={voltar}>Voltar</button>
           ) : (
             <>
               {edicao && (
-                <button type="button" className="btn btn-outline-danger" onClick={() => setExcluindo(true)}>
+                <button type="button" className="btn btn-perigo-suave" onClick={() => setExcluindo(true)}>
                   <Icone nome="lixeira" tamanho={16} /> Excluir
                 </button>
               )}
-              <button type="button" className="btn btn-outline-secondary" onClick={voltar}>Cancelar</button>
-              <button type="submit" className="btn btn-primary" disabled={enviando} title="Salvar (Ctrl+S)">
-                {enviando && <span className="spinner-border spinner-border-sm" />}
+              <button type="button" className="btn btn-secundario" onClick={voltar}>Cancelar</button>
+              <button type="submit" className="btn btn-primario" disabled={enviando} title="Salvar (Ctrl+S)">
+                {enviando && <span className="spinner" />}
                 {enviando ? 'Salvando...' : 'Salvar'}
               </button>
             </>
@@ -322,15 +318,13 @@ export default function FormularioCadastro({ config, id, onNavegar, notificar })
   return (
     <>
       <div className="page-header">
-        <div className="d-flex align-items-center gap-2 min-w-0">
+        <div className="page-header-titulo">
           <button type="button" className="btn-icone voltar" onClick={voltar} aria-label="Voltar">
             <Icone nome="voltar" tamanho={20} />
           </button>
           <div className="min-w-0">
             <span className="page-sobretitulo">{edicao ? `Editar ${config.singular}` : config.plural}</span>
-            <h1 className="page-title text-truncate">
-              {edicao ? config.nomeExibicao(registro) : config.novo}
-            </h1>
+            <h1 className="page-title truncar">{edicao ? config.nomeExibicao(registro) : config.novo}</h1>
           </div>
         </div>
       </div>
@@ -338,11 +332,11 @@ export default function FormularioCadastro({ config, id, onNavegar, notificar })
       {excluido && (
         <div className="aviso aviso-erro">
           <Icone nome="lixeira" />
-          <span className="flex-grow-1">
-            Excluído por <strong>{registro.excluidoPor}</strong> em {formatarDataHora(registro.excluidoEm)}.
-            {' '}Motivo: {registro.motivoExclusao}
-          </span>
-          <button type="button" className="btn btn-sm btn-outline-danger" onClick={restaurar}>
+          <div className="aviso-texto">
+            Excluído por <strong>{registro.excluidoPor}</strong> em {formatarDataHora(registro.excluidoEm)}
+            <div className="limite-linhas" title={registro.motivoExclusao}>Motivo: {registro.motivoExclusao}</div>
+          </div>
+          <button type="button" className="btn btn-perigo-suave btn-pequeno" onClick={restaurar}>
             <Icone nome="restaurar" tamanho={15} /> Restaurar
           </button>
         </div>

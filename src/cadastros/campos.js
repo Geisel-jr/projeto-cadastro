@@ -3,11 +3,8 @@ import { apenasDigitos } from '../utils/formatadores';
 import { tipoDe } from './tipos';
 
 // Lista todos os campos do cadastro, cada um sabendo em qual aba está
-// (itens { secao } são só títulos visuais e ficam de fora)
 export const camposDe = (config) =>
-  config.abas.flatMap((aba) =>
-    aba.campos.filter((campo) => campo.nome).map((campo) => ({ ...campo, aba: aba.id }))
-  );
+  config.abas.flatMap((aba) => aba.campos.map((campo) => ({ ...campo, aba: aba.id })));
 
 const visivel = (campo, dados) => !campo.visivel || campo.visivel(dados);
 

@@ -53,18 +53,19 @@ export default function Auditoria({ onNavegar }) {
           <div className="busca">
             <Icone nome="busca" tamanho={17} />
             <input
-              className="form-control"
-              placeholder="Filtrar por operador..."
+              className="entrada"
+              placeholder="Operador..."
+              aria-label="Filtrar por operador"
               value={usuarioDigitado}
               onChange={(e) => setUsuarioDigitado(e.target.value)}
             />
           </div>
-          <select className="form-select filtro" value={consulta.entidade} onChange={alterarFiltro('entidade')}>
+          <select className="entrada filtro" value={consulta.entidade} onChange={alterarFiltro('entidade')}>
             <option value="">Todos os cadastros</option>
             <option value="empresas">Empresas</option>
             <option value="pessoas">Pessoas</option>
           </select>
-          <select className="form-select filtro" value={consulta.acao} onChange={alterarFiltro('acao')}>
+          <select className="entrada filtro" value={consulta.acao} onChange={alterarFiltro('acao')}>
             <option value="">Todas as ações</option>
             <option value="CRIAR">Criação</option>
             <option value="EDITAR">Edição</option>
@@ -79,7 +80,7 @@ export default function Auditoria({ onNavegar }) {
         <div className="painel-corpo">
           {erro ? (
             <div className="estado">
-              <span className="estado-icone erro"><Icone nome="alerta" tamanho={28} /></span>
+              <span className="estado-icone erro"><Icone nome="alerta" tamanho={24} /></span>
               <p>{erro}</p>
             </div>
           ) : (
@@ -91,10 +92,10 @@ export default function Auditoria({ onNavegar }) {
                   onAbrir={(entidade, id) => onNavegar({ pagina: 'form', entidade, id })}
                 />
               )}
-              {carregando && <div className="estado"><div className="spinner-border text-primary" /></div>}
+              {carregando && <div className="carregando"><span className="spinner" /></div>}
               {temMais && !carregando && (
-                <div className="text-center pt-3">
-                  <button className="btn btn-outline-secondary btn-sm" onClick={() => setConsulta((c) => ({ ...c, pagina: c.pagina + 1 }))}>
+                <div className="carregar-mais">
+                  <button className="btn btn-secundario btn-pequeno" onClick={() => setConsulta((c) => ({ ...c, pagina: c.pagina + 1 }))}>
                     Carregar mais
                   </button>
                 </div>
