@@ -11,14 +11,14 @@ import {
   validarTelefone,
 } from '../utils/formatadores';
 
-export const UFS = [
+const UFS = [
   'AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', 'MT', 'MS', 'MG', 'PA',
   'PB', 'PR', 'PE', 'PI', 'RJ', 'RN', 'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO',
 ];
 
 // Comportamento de cada tipo de campo: máscara, validação, formatação e atributos do input.
 // "digitos: true" faz o valor ser enviado à API só com números.
-export const TIPOS = {
+const TIPOS = {
   texto: {},
   textarea: {},
   select: {},

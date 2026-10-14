@@ -3,7 +3,7 @@ const path = require('path');
 const express = require('express');
 const multer = require('multer');
 const { enviarArquivo, lerArquivo, removerArquivo } = require('./storage');
-const { linhaParaObjeto, emTransacao, registrarAuditoria, lerMotivo, ErroHttp } = require('./util');
+const { linhaParaObjeto, emTransacao, registrarAuditoria, lerId, lerMotivo, ErroHttp } = require('./util');
 
 // Tipos de documento oferecidos no cadastro. "Cartão CNPJ" é o padrão.
 const TIPOS_DOCUMENTO = [
@@ -43,12 +43,6 @@ function nomeOriginal(arquivo) {
   const convertido = Buffer.from(nome, 'latin1').toString('utf8');
   return convertido.includes('�') ? nome : convertido;
 }
-
-const lerId = (valor) => {
-  const id = Number(valor);
-  if (!Number.isInteger(id) || id <= 0) throw new ErroHttp(400, 'ID inválido.');
-  return id;
-};
 
 // Rotas de documentos de uma empresa: /api/empresas/:empresaId/documentos
 function rotasDocumentos({ pool }) {

@@ -28,7 +28,7 @@ export function validarFormulario(config, dados) {
 }
 
 // Aplica a máscara do campo (se houver) a um valor vindo da API ou de uma consulta
-export const formatarEntrada = (campo, valor) => {
+const formatarEntrada = (campo, valor) => {
   if (valor === null || valor === undefined) return '';
   const { mascara } = tipoDe(campo);
   return mascara ? mascara(valor) : String(valor);

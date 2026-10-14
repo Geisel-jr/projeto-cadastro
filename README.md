@@ -80,6 +80,7 @@ O painel web do MinIO fica em http://localhost:9001 (usuário `minioadmin`, senh
 │   ├── storage.js        # Conexão com o MinIO
 │   ├── validacoes.js     # Validação dos dados recebidos
 │   ├── db.js             # Conexão e execução das migrations
+│   ├── util.js           # Funções comuns (transação, auditoria, erros HTTP)
 │   └── migrations/       # Scripts SQL de criação e evolução do banco
 ├── nginx.conf            # Servidor do front (repassa /api para a API)
 ├── dockerfile            # Imagem do front

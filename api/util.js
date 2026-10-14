@@ -44,6 +44,13 @@ class ErroHttp extends Error {
   }
 }
 
+// ID numérico vindo da URL (ex: req.params.id)
+function lerId(valor) {
+  const id = Number(valor);
+  if (!Number.isInteger(id) || id <= 0) throw new ErroHttp(400, 'ID inválido.');
+  return id;
+}
+
 // Motivo obrigatório de exclusões e remoções (3 a 500 caracteres)
 function lerMotivo(corpo) {
   const motivo = String(corpo?.motivo ?? '').trim();
@@ -52,4 +59,4 @@ function lerMotivo(corpo) {
   return motivo;
 }
 
-module.exports = { paraSnake, paraCamel, linhaParaObjeto, emTransacao, registrarAuditoria, lerMotivo, ErroHttp };
+module.exports = { paraSnake, linhaParaObjeto, emTransacao, registrarAuditoria, lerId, lerMotivo, ErroHttp };

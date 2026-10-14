@@ -3,5 +3,6 @@ build
 .git
 *.log
 api
-db
+.env
+.claude
 docker-compose.yml

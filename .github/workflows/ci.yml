@@ -47,7 +47,7 @@ jobs:
         run: npm ci
 
       - name: Verificar sintaxe
-        run: node --check server.js && node --check validacoes.js
+        run: for arquivo in *.js; do node --check "$arquivo"; done
 
   docker:
     name: Docker (sobe tudo e testa)

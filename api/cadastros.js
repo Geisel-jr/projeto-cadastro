@@ -1,6 +1,6 @@
 const express = require('express');
 const { validar } = require('./validacoes');
-const { paraSnake, linhaParaObjeto, emTransacao, registrarAuditoria, lerMotivo, ErroHttp } = require('./util');
+const { paraSnake, linhaParaObjeto, emTransacao, registrarAuditoria, lerId, lerMotivo, ErroHttp } = require('./util');
 
 // Cria as rotas de um cadastro (empresas ou pessoas):
 //
@@ -29,12 +29,6 @@ function rotasCadastro({ pool, tabela, regras, consulta, verificar }) {
     return registro;
   };
 
-  const lerId = (req) => {
-    const id = Number(req.params.id);
-    if (!Number.isInteger(id) || id <= 0) throw new ErroHttp(400, 'ID inválido.');
-    return id;
-  };
-
   const validarCorpo = async (corpo) => {
     const { dados, erros } = validar(regras, corpo);
     if (verificar) Object.assign(erros, await verificar(pool, dados, erros));
@@ -54,13 +48,13 @@ function rotasCadastro({ pool, tabela, regras, consulta, verificar }) {
   });
 
   router.get('/:id', async (req, res) => {
-    res.json(await buscarOuFalhar(pool, lerId(req)));
+    res.json(await buscarOuFalhar(pool, lerId(req.params.id)));
   });
 
   router.get('/:id/historico', async (req, res) => {
     const { rows } = await pool.query(
       'SELECT * FROM auditoria WHERE entidade = $1 AND registro_id = $2 ORDER BY data DESC, id DESC',
-      [tabela, lerId(req)]
+      [tabela, lerId(req.params.id)]
     );
     res.json(rows.map(linhaParaObjeto));
   });
@@ -85,7 +79,7 @@ function rotasCadastro({ pool, tabela, regras, consulta, verificar }) {
   });
 
   router.put('/:id', async (req, res) => {
-    const id = lerId(req);
+    const id = lerId(req.params.id);
     const dados = await validarCorpo(req.body);
 
     const registro = await emTransacao(pool, async (db) => {
@@ -111,7 +105,7 @@ function rotasCadastro({ pool, tabela, regras, consulta, verificar }) {
   });
 
   router.delete('/:id', async (req, res) => {
-    const id = lerId(req);
+    const id = lerId(req.params.id);
     const motivo = lerMotivo(req.body);
 
     const registro = await emTransacao(pool, async (db) => {
@@ -131,7 +125,7 @@ function rotasCadastro({ pool, tabela, regras, consulta, verificar }) {
   });
 
   router.post('/:id/restaurar', async (req, res) => {
-    const id = lerId(req);
+    const id = lerId(req.params.id);
 
     const registro = await emTransacao(pool, async (db) => {
       const antes = await buscarOuFalhar(db, id, true);

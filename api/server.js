@@ -144,7 +144,9 @@ app.use((erro, req, res, next) => {
     return res.status(erro.status).json({ error: erro.message, erros: erro.erros });
   }
   if (erro.name === 'MulterError') {
-    const mensagem = erro.code === 'LIMIT_FILE_SIZE' ? 'Arquivo maior que 10 MB.' : 'Envio de arquivo inválido.';
+    const mensagem = erro.code === 'LIMIT_FILE_SIZE'
+      ? `Arquivo maior que ${TAMANHO_MAXIMO / 1024 / 1024} MB.`
+      : 'Envio de arquivo inválido.';
     return res.status(400).json({ error: mensagem, erros: { arquivo: mensagem } });
   }
   if (erro.type === 'entity.parse.failed') {
