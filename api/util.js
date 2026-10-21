@@ -26,12 +26,16 @@ async function emTransacao(pool, funcao) {
   }
 }
 
-// Grava uma ação na tabela de auditoria (deve rodar dentro da mesma transação da alteração)
-const registrarAuditoria = (db, req, { entidade, registroId, acao, antes = null, depois = null, motivo = null }) =>
+// Grava uma ação na tabela de auditoria (deve rodar dentro da mesma transação da alteração).
+// Quem fez vem do usuário autenticado (req.usuario / req.usuarioId), salvo quando informado.
+const registrarAuditoria = (db, req, {
+  entidade, registroId, acao, antes = null, depois = null, motivo = null,
+  usuario = req.usuario, usuarioId = req.usuarioId ?? null,
+}) =>
   db.query(
-    `INSERT INTO auditoria (entidade, registro_id, acao, usuario, ip, dados_anteriores, dados_novos, motivo)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-    [entidade, registroId, acao, req.usuario, req.ipOrigem,
+    `INSERT INTO auditoria (entidade, registro_id, acao, usuario, usuario_id, ip, dados_anteriores, dados_novos, motivo)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+    [entidade, registroId, acao, usuario, usuarioId, req.ipOrigem,
       antes && JSON.stringify(antes), depois && JSON.stringify(depois), motivo]
   );
 

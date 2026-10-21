@@ -146,6 +146,7 @@ export default function PainelDocumentos({ empresaId, bloqueado, notificar, onAl
                   key={doc.id}
                   doc={doc}
                   empresaId={empresaId}
+                  notificar={notificar}
                   acao={!bloqueado && (
                     <button className="btn-acao perigo" onClick={() => setRemovendo(doc)} title="Remover" aria-label="Remover">
                       <Icone nome="lixeira" tamanho={16} />
@@ -166,6 +167,7 @@ export default function PainelDocumentos({ empresaId, bloqueado, notificar, onAl
                     key={doc.id}
                     doc={doc}
                     empresaId={empresaId}
+                  notificar={notificar}
                     acao={!bloqueado && (
                       <button className="btn-acao" onClick={() => restaurar(doc)} title="Restaurar" aria-label="Restaurar">
                         <Icone nome="restaurar" tamanho={16} />
@@ -195,8 +197,10 @@ export default function PainelDocumentos({ empresaId, bloqueado, notificar, onAl
   );
 }
 
-function ItemDocumento({ doc, empresaId, acao }) {
+function ItemDocumento({ doc, empresaId, notificar, acao }) {
   const ext = extensaoDe(doc.nomeArquivo);
+  const abrir = (baixar) => apiDocumentos.abrir(empresaId, doc, { baixar })
+    .catch((e) => notificar('erro', 'Não foi possível abrir o arquivo', mensagemErro(e)));
   return (
     <li className="documento">
       <span className={`doc-icone ${ext}`}>{ROTULO_ARQUIVO[ext] || 'ARQ'}</span>
@@ -214,12 +218,12 @@ function ItemDocumento({ doc, empresaId, acao }) {
         {!doc.excluidoEm && doc.validade && <Validade data={doc.validade} />}
       </div>
       <div className="doc-acoes">
-        <a className="btn-acao" href={apiDocumentos.url(empresaId, doc.id)} target="_blank" rel="noopener noreferrer" title="Visualizar" aria-label="Visualizar">
+        <button className="btn-acao" onClick={() => abrir(false)} title="Visualizar" aria-label="Visualizar">
           <Icone nome="olho" tamanho={16} />
-        </a>
-        <a className="btn-acao" href={apiDocumentos.url(empresaId, doc.id, true)} title="Baixar" aria-label="Baixar">
+        </button>
+        <button className="btn-acao" onClick={() => abrir(true)} title="Baixar" aria-label="Baixar">
           <Icone nome="download" tamanho={16} />
-        </a>
+        </button>
         {acao}
       </div>
     </li>

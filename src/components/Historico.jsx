@@ -10,7 +10,33 @@ const ACOES = {
   ANEXAR: { verbo: 'anexou um documento', rotulo: 'Anexo', classe: 'criar', anexo: true },
   REMOVER_ANEXO: { verbo: 'removeu um documento', rotulo: 'Remoção de anexo', classe: 'excluir', anexo: true },
   RESTAURAR_ANEXO: { verbo: 'restaurou um documento', rotulo: 'Restauração de anexo', classe: 'restaurar', anexo: true },
+  // Eventos de acesso: a ação é sobre a própria pessoa, sem registro alvo
+  LOGIN: { verbo: 'entrou no sistema', rotulo: 'Login', classe: 'acesso', acesso: true },
+  LOGOUT: { verbo: 'saiu do sistema', rotulo: 'Saída', classe: 'acesso', acesso: true },
+  LOGIN_FALHOU: { verbo: 'teve o acesso recusado', rotulo: 'Acesso recusado', classe: 'excluir', acesso: true },
+  TROCAR_SENHA: { verbo: 'alterou a própria senha', rotulo: 'Senha', classe: 'editar', acesso: true },
+  REDEFINIR_SENHA: { verbo: 'redefiniu a senha de', rotulo: 'Senha', classe: 'editar', semArtigo: true },
 };
+
+const METODOS = { senha: 'Com e-mail e senha', google: 'Com Google' };
+
+// Usuários não têm formulário de cadastro como empresas e pessoas; este resumo basta
+// para o histórico nomear o usuário e mostrar o que mudou.
+const USUARIOS = {
+  singular: 'usuário',
+  artigo: 'o',
+  semLink: true,
+  nomeExibicao: (r) => r?.nome || '—',
+  abas: [{
+    id: 'dados',
+    campos: [
+      { nome: 'nome', label: 'Nome' },
+      { nome: 'papel', label: 'Perfil', exibir: (v) => (v === 'admin' ? 'Administrador' : 'Operador') },
+      { nome: 'ativo', label: 'Situação', exibir: (v) => (v ? 'Ativo' : 'Inativo') },
+    ],
+  }],
+};
+const configDe = (entidade) => (entidade === 'usuarios' ? USUARIOS : CADASTROS[entidade]);
 
 // Nas ações com anexos, os dados gravados são do documento (não da empresa)
 const descreverDocumento = (doc) => `${doc.tipo === 'Outros' ? doc.descricao : doc.tipo} · ${doc.nomeArquivo}`;
@@ -35,7 +61,7 @@ export default function Historico({ itens, mostrarRegistro = false, onAbrir }) {
   return (
     <ul className="historico">
       {itens.map((item, indice) => {
-        const config = CADASTROS[item.entidade];
+        const config = configDe(item.entidade);
         const acao = ACOES[item.acao];
         const dados = item.dadosNovos || item.dadosAnteriores;
         const nomeRegistro = acao.anexo ? dados?.empresaNome : config?.nomeExibicao(dados);
@@ -49,12 +75,17 @@ export default function Historico({ itens, mostrarRegistro = false, onAbrir }) {
               <div className="historico-linha">
                 <span>
                   <strong>{item.usuario}</strong> {acao.verbo}
-                  {mostrarRegistro && config && (
+                  {(mostrarRegistro || acao.semArtigo) && config && !acao.acesso && (
                     <>
-                      {' '}{acao.anexo ? 'da' : 'a'} {config.singular}{' '}
-                      <button className="link-registro" onClick={() => onAbrir?.(item.entidade, item.registroId)}>
-                        {nomeRegistro}
-                      </button>
+                      {' '}
+                      {!acao.semArtigo && `${acao.anexo ? 'da' : config.artigo || 'a'} ${config.singular} `}
+                      {config.semLink ? (
+                        <strong>{nomeRegistro}</strong>
+                      ) : (
+                        <button className="link-registro" onClick={() => onAbrir?.(item.entidade, item.registroId)}>
+                          {nomeRegistro}
+                        </button>
+                      )}
                     </>
                   )}
                 </span>
@@ -65,6 +96,7 @@ export default function Historico({ itens, mostrarRegistro = false, onAbrir }) {
               </span>
 
               {acao.anexo && dados && <div className="historico-detalhe">{descreverDocumento(dados)}</div>}
+              {item.acao === 'LOGIN' && dados?.metodo && <div className="historico-detalhe">{METODOS[dados.metodo]}</div>}
               {item.motivo && (
                 <div className="historico-detalhe" title={item.motivo}>
                   <span className="limite-linhas">Motivo: {item.motivo}</span>

@@ -10,6 +10,8 @@ COPY . .
 # No Docker o front chama "/api" e o nginx repassa para o container da API
 ARG REACT_APP_API_URL=/api
 ENV REACT_APP_API_URL=$REACT_APP_API_URL
+# Sem script embutido no index.html (compatível com a Content-Security-Policy do nginx)
+ENV INLINE_RUNTIME_CHUNK=false
 
 RUN npm run build
 

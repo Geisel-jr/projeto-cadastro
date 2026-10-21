@@ -5,27 +5,60 @@ import pessoa from './cadastros/pessoa';
 import { paraEnvio, paraFormulario, validarFormulario } from './cadastros/campos';
 import { mascaraCNPJ, mascaraCPF, validarCNPJ, validarCPF } from './utils/formatadores';
 
-// Respostas falsas da API para os testes
+// JWT de teste: só o campo "exp" importa para o front (quem valida a assinatura é a API)
+const tokenFalso = () => {
+  const corpo = btoa(JSON.stringify({ exp: Math.floor(Date.now() / 1000) + 900 }));
+  return `cabecalho.${corpo}.assinatura`;
+};
+const usuarioTeste = {
+  id: 1, nome: 'Ana Souza', email: 'ana@empresa.com', papel: 'operador',
+  temSenha: true, temGoogle: false, deveTrocarSenha: false,
+};
+const resposta = (status, corpo) => Promise.resolve({ ok: status < 400, status, json: () => Promise.resolve(corpo) });
+
+// Respostas falsas da API. "loginResponde" define o que o POST /auth/login devolve.
+let loginResponde;
 beforeEach(() => {
-  localStorage.clear();
+  loginResponde = () => resposta(200, { tokenAcesso: tokenFalso(), usuario: usuarioTeste });
   global.fetch = jest.fn((url) => {
-    const corpo = url.includes('/resumo')
-      ? { empresas: 0, empresasExcluidas: 0, pessoas: 0, pessoasExcluidas: 0, acoesDia: 0 }
-      : url.includes('/auditoria') ? { itens: [], temMais: false } : [];
-    return Promise.resolve({ ok: true, json: () => Promise.resolve(corpo) });
+    if (url.includes('/auth/renovar')) return resposta(401, { error: 'Sessão encerrada.' });
+    if (url.includes('/auth/config')) return resposta(200, { googleClientId: null });
+    if (url.includes('/auth/login')) return loginResponde();
+    if (url.includes('/resumo')) return resposta(200, { empresas: 0, empresasExcluidas: 0, pessoas: 0, pessoasExcluidas: 0, acoesDia: 0 });
+    if (url.includes('/auditoria')) return resposta(200, { itens: [], temMais: false });
+    return resposta(200, []);
   });
 });
 
-test('pede a identificação do operador no primeiro acesso', async () => {
+const preencherLogin = async () => {
+  fireEvent.change(await screen.findByLabelText('E-mail'), { target: { value: 'ana@empresa.com' } });
+  fireEvent.change(screen.getByLabelText('Senha'), { target: { value: 'Senha123' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Entrar' }));
+};
+
+test('sem sessão, mostra a tela de login e entra no sistema', async () => {
   render(<App />);
-  expect(screen.getByText('Quem está usando o sistema?')).toBeInTheDocument();
+  expect(await screen.findByRole('heading', { name: 'Entrar' })).toBeInTheDocument();
+  await preencherLogin();
 
-  fireEvent.change(screen.getByLabelText(/seu nome/i), { target: { value: 'Ana Souza' } });
-  fireEvent.click(screen.getByRole('button', { name: 'Confirmar' }));
+  expect(await screen.findByRole('heading', { name: 'Painel' })).toBeInTheDocument();
+  expect(screen.getByTitle('Ana Souza')).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Usuários' })).not.toBeInTheDocument(); // operador não vê
+});
 
-  expect(screen.queryByText('Quem está usando o sistema?')).not.toBeInTheDocument();
-  expect(screen.getByTitle('Trocar operador')).toHaveTextContent('Ana Souza');
-  expect(await screen.findByText('Nenhuma ação registrada.')).toBeInTheDocument();
+test('login recusado mostra a mensagem da API', async () => {
+  loginResponde = () => resposta(401, { error: 'E-mail ou senha incorretos.' });
+  render(<App />);
+  await preencherLogin();
+  expect(await screen.findByRole('alert')).toHaveTextContent('E-mail ou senha incorretos.');
+});
+
+test('senha provisória exige a troca antes de mostrar o sistema', async () => {
+  loginResponde = () => resposta(200, { tokenAcesso: tokenFalso(), usuario: { ...usuarioTeste, deveTrocarSenha: true } });
+  render(<App />);
+  await preencherLogin();
+  expect(await screen.findByText('Crie sua senha')).toBeInTheDocument();
+  expect(screen.queryByRole('heading', { name: 'Painel' })).not.toBeInTheDocument();
 });
 
 test('aplica máscaras e valida documentos', () => {

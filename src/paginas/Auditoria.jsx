@@ -54,8 +54,8 @@ export default function Auditoria({ onNavegar }) {
             <Icone nome="busca" tamanho={17} />
             <input
               className="entrada"
-              placeholder="Operador..."
-              aria-label="Filtrar por operador"
+              placeholder="Usuário..."
+              aria-label="Filtrar por usuário"
               value={usuarioDigitado}
               onChange={(e) => setUsuarioDigitado(e.target.value)}
             />
@@ -64,6 +64,7 @@ export default function Auditoria({ onNavegar }) {
             <option value="">Todos os cadastros</option>
             <option value="empresas">Empresas</option>
             <option value="pessoas">Pessoas</option>
+            <option value="usuarios">Usuários e acesso</option>
           </select>
           <select className="entrada filtro" value={consulta.acao} onChange={alterarFiltro('acao')}>
             <option value="">Todas as ações</option>
@@ -74,6 +75,11 @@ export default function Auditoria({ onNavegar }) {
             <option value="ANEXAR">Anexo de documento</option>
             <option value="REMOVER_ANEXO">Remoção de documento</option>
             <option value="RESTAURAR_ANEXO">Restauração de documento</option>
+            <option value="LOGIN">Login</option>
+            <option value="LOGIN_FALHOU">Acesso recusado</option>
+            <option value="LOGOUT">Saída</option>
+            <option value="TROCAR_SENHA">Troca de senha</option>
+            <option value="REDEFINIR_SENHA">Redefinição de senha</option>
           </select>
         </div>
 

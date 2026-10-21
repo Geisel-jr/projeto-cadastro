@@ -1,5 +1,8 @@
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
+const cookieParser = require('cookie-parser');
+const { rateLimit, ipKeyGenerator } = require('express-rate-limit');
 require('dotenv').config({ quiet: true });
 
 const { pool, migrar } = require('./db');
@@ -8,31 +11,40 @@ const { rotasDocumentos, TIPOS_DOCUMENTO, TIPOS_ARQUIVO, TAMANHO_MAXIMO } = requ
 const { prepararStorage } = require('./storage');
 const { REGRAS_EMPRESA, REGRAS_PESSOA } = require('./validacoes');
 const { linhaParaObjeto, ErroHttp } = require('./util');
+const { rotasAuth, autenticar, exigirPapel, criarAdministradorInicial, limparSessoesAntigas } = require('./auth');
+const { rotasUsuarios } = require('./usuarios');
 
 const app = express();
 
-// Middleware
-app.use(cors());
-app.use(express.json());
+// Cabeçalhos de segurança (X-Content-Type-Options, X-Frame-Options, CSP etc.)
+app.use(helmet());
 
-// Identifica quem está fazendo a requisição (usado na auditoria).
-// Leituras são livres; qualquer alteração exige o cabeçalho X-Usuario.
+// CORS só para as origens do front (lista em CORS_ORIGINS), com envio de cookies
+const ORIGENS = (process.env.CORS_ORIGINS || 'http://localhost:3000,http://localhost:3001').split(',').map((o) => o.trim());
+app.use(cors({
+  origin: ORIGENS,
+  credentials: true,
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+}));
+
+app.use(express.json({ limit: '100kb' }));
+app.use(cookieParser());
+
+// IP de origem (o nginx repassa o IP real no cabeçalho X-Real-IP)
 app.use('/api', (req, res, next) => {
   req.ipOrigem = (req.get('x-real-ip') || req.ip || '').replace(/^::ffff:/, '');
-  if (req.method === 'GET') return next();
-
-  let usuario = '';
-  try {
-    usuario = decodeURIComponent(req.get('x-usuario') || '').trim();
-  } catch {
-    // cabeçalho mal formatado: tratado como ausente
-  }
-  if (!usuario) {
-    return res.status(401).json({ error: 'Identifique o operador antes de realizar alterações.' });
-  }
-  req.usuario = usuario.slice(0, 100);
   next();
 });
+
+// Limite geral contra abuso: 600 requisições a cada 5 minutos por IP
+app.use('/api', rateLimit({
+  windowMs: 5 * 60 * 1000,
+  limit: 600,
+  standardHeaders: 'draft-8',
+  legacyHeaders: false,
+  keyGenerator: (req) => ipKeyGenerator(req.ipOrigem),
+  handler: (req, res) => res.status(429).json({ error: 'Muitas requisições. Aguarde um pouco.' }),
+}));
 
 // Verifica se a API e o banco estão no ar
 app.get('/api/health', async (req, res) => {
@@ -43,6 +55,15 @@ app.get('/api/health', async (req, res) => {
     res.status(503).json({ status: 'erro', error: 'Banco de dados indisponível.' });
   }
 });
+
+// ========== AUTENTICAÇÃO (rotas públicas) ==========
+
+app.use('/api/auth', rotasAuth({ pool }));
+
+// Daqui para baixo, toda rota exige login
+app.use('/api', autenticar);
+
+app.use('/api/usuarios', exigirPapel('admin'), rotasUsuarios({ pool }));
 
 // ========== DOCUMENTOS (anexos das empresas) ==========
 
@@ -137,6 +158,7 @@ app.get('/api/resumo', async (req, res) => {
 const DUPLICADOS = {
   empresas_cnpj_ativo: { campo: 'cnpj', mensagem: 'Já existe uma empresa ativa com este CNPJ.' },
   pessoas_cpf_ativo: { campo: 'cpf', mensagem: 'Já existe uma pessoa ativa com este CPF.' },
+  usuarios_email: { campo: 'email', mensagem: 'Já existe um usuário com este e-mail.' },
 };
 
 app.use((erro, req, res, next) => {
@@ -168,8 +190,11 @@ app.use((erro, req, res, next) => {
 const PORT = process.env.PORT || 5000;
 
 migrar()
+  .then(() => criarAdministradorInicial(pool))
   .then(prepararStorage)
   .then(() => {
+    limparSessoesAntigas(pool);
+    setInterval(() => limparSessoesAntigas(pool), 6 * 60 * 60 * 1000).unref();
     app.listen(PORT, () => {
       console.log(`✅ Servidor rodando em http://localhost:${PORT}`);
     });

@@ -29,7 +29,7 @@ jobs:
         run: npm run build
 
   api:
-    name: API (dependências e sintaxe)
+    name: API (dependências, sintaxe e testes de segurança)
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -49,10 +49,18 @@ jobs:
       - name: Verificar sintaxe
         run: for arquivo in *.js; do node --check "$arquivo"; done
 
+      - name: Testes de segurança (senhas e tokens)
+        run: npm test
+
   docker:
     name: Docker (sobe tudo e testa)
     runs-on: ubuntu-latest
     needs: [front, api]
+    env:
+      # Valores só para a CI (o docker compose lê estas variáveis do ambiente)
+      JWT_SECRET: segredo-da-ci-com-tamanho-suficiente-para-assinar-tokens
+      ADMIN_EMAIL: admin@ci.local
+      ADMIN_PASSWORD: SenhaProvisoria1
     steps:
       - uses: actions/checkout@v4
 
@@ -64,29 +72,41 @@ jobs:
           set -e
           URL=http://localhost:3000/api
           J='Content-Type: application/json'
-          U='X-Usuario: CI'
           EMPRESA='{"nome":"Empresa CI","cnpj":"11222333000181","email":"ci@teste.com","telefone":"11988887777","cep":"01001000"}'
 
           # status HTTP de uma requisição
           status() { curl -s -o /dev/null -w '%{http_code}' "$@"; }
           esperar() { echo "→ $1"; test "$2" = "$3" || { echo "  esperado $3, recebido $2"; exit 1; }; }
+          # extrai o "tokenAcesso" de uma resposta JSON
+          token() { grep -o '"tokenAcesso":"[^"]*"' | cut -d'"' -f4; }
 
           echo "→ Front responde"
           curl -sf http://localhost:3000 > /dev/null
           echo "→ API e banco estão no ar"
           curl -sf $URL/health
 
-          esperar "Alteração sem operador retorna 401" "$(status -X POST $URL/empresas -H "$J" -d "$EMPRESA")" 401
+          # Autenticação
+          esperar "Sem login retorna 401" "$(status $URL/empresas)" 401
+          esperar "Senha errada retorna 401" "$(status -X POST $URL/auth/login -H "$J" -d '{"email":"admin@ci.local","senha":"Errada123"}')" 401
+          PROVISORIO=$(curl -s -X POST $URL/auth/login -H "$J" -d '{"email":"admin@ci.local","senha":"SenhaProvisoria1"}' | token)
+          esperar "Senha provisória bloqueia os cadastros (403)" "$(status $URL/empresas -H "Authorization: Bearer $PROVISORIO")" 403
+          TOKEN=$(curl -s -X POST $URL/auth/trocar-senha -H "$J" -H "Authorization: Bearer $PROVISORIO" \
+            -d '{"senhaAtual":"SenhaProvisoria1","novaSenha":"SenhaDefinitiva2"}' | token)
+          U="Authorization: Bearer $TOKEN"
+          esperar "Depois da troca de senha, cadastros liberados" "$(status $URL/empresas -H "$U")" 200
+
+          # Cadastros, soft delete e auditoria
           esperar "Empresa válida retorna 201" "$(status -X POST $URL/empresas -H "$J" -H "$U" -d "$EMPRESA")" 201
           esperar "CNPJ duplicado retorna 409" "$(status -X POST $URL/empresas -H "$J" -H "$U" -d "$EMPRESA")" 409
           esperar "Edição retorna 200" "$(status -X PUT $URL/empresas/1 -H "$J" -H "$U" \
             -d '{"nome":"Empresa CI Editada","cnpj":"11222333000181","email":"ci@teste.com","telefone":"1133334444","cep":"01001000","porte":"ME"}')" 200
           esperar "Exclusão sem motivo retorna 400" "$(status -X DELETE $URL/empresas/1 -H "$J" -H "$U" -d '{}')" 400
           esperar "Exclusão com motivo retorna 200" "$(status -X DELETE $URL/empresas/1 -H "$J" -H "$U" -d '{"motivo":"Teste da CI"}')" 200
-          esperar "Registro excluído some dos ativos" "$(curl -s $URL/empresas)" "[]"
-          esperar "Registro excluído continua no banco" "$(curl -s "$URL/empresas?status=excluidos" | grep -c 'Teste da CI')" 1
+          esperar "Registro excluído some dos ativos" "$(curl -s $URL/empresas -H "$U")" "[]"
+          esperar "Registro excluído continua no banco" "$(curl -s "$URL/empresas?status=excluidos" -H "$U" | grep -c 'Teste da CI')" 1
           esperar "Restauração retorna 200" "$(status -X POST $URL/empresas/1/restaurar -H "$U")" 200
-          esperar "Auditoria registrou as 4 ações" "$(curl -s $URL/empresas/1/historico | grep -o '"acao"' | wc -l)" 4
+          esperar "Auditoria registrou as 4 ações" "$(curl -s $URL/empresas/1/historico -H "$U" | grep -o '"acao"' | wc -l)" 4
+          esperar "Auditoria registra o autor pelo login" "$(curl -s $URL/empresas/1 -H "$U" | grep -c '"criadoPor":"Administrador"')" 1
 
           # Documentos (arquivos no MinIO)
           PASTA=$(mktemp -d)
@@ -95,15 +115,18 @@ jobs:
           esperar "Anexo sem arquivo retorna 400" "$(status -X POST $URL/empresas/1/documentos -H "$U" -F "tipo=<$PASTA/tipo.txt")" 400
           esperar "Anexo de documento retorna 201" "$(status -X POST $URL/empresas/1/documentos -H "$U" \
             -F "tipo=<$PASTA/tipo.txt" -F "arquivo=@$PASTA/cartao.pdf;type=application/pdf")" 201
-          curl -s -o "$PASTA/baixado.pdf" $URL/empresas/1/documentos/1/arquivo
+          esperar "Arquivo exige login (401)" "$(status $URL/empresas/1/documentos/1/arquivo)" 401
+          curl -s -o "$PASTA/baixado.pdf" $URL/empresas/1/documentos/1/arquivo -H "$U"
           esperar "Arquivo baixado é igual ao enviado" "$(cmp -s "$PASTA/cartao.pdf" "$PASTA/baixado.pdf" && echo ok)" ok
           esperar "Remoção de anexo retorna 200" "$(status -X DELETE $URL/empresas/1/documentos/1 -H "$J" -H "$U" -d '{"motivo":"Teste da CI"}')" 200
           esperar "Restauração de anexo retorna 200" "$(status -X POST $URL/empresas/1/documentos/1/restaurar -H "$U")" 200
-          esperar "Histórico da empresa inclui os anexos" "$(curl -s $URL/empresas/1/historico | grep -o '"acao"' | wc -l)" 7
+          esperar "Histórico da empresa inclui os anexos" "$(curl -s $URL/empresas/1/historico -H "$U" | grep -o '"acao"' | wc -l)" 7
 
           esperar "Pessoa inválida retorna 400" "$(status -X POST $URL/pessoas -H "$J" -H "$U" -d '{"nome":"X"}')" 400
           esperar "Pessoa vinculada à empresa retorna 201" "$(status -X POST $URL/pessoas -H "$J" -H "$U" \
             -d '{"nome":"Maria da Silva","cpf":"12345678909","email":"maria@email.com","telefone":"31999990000","dataNascimento":"1995-04-20","profissao":"QA","empresaId":1}')" 201
+
+          esperar "Front envia o cabeçalho CSP" "$(curl -sI http://localhost:3000 | grep -ci 'content-security-policy')" 1
 
           echo "✅ Todos os testes passaram"
 

@@ -7,6 +7,7 @@ banco PostgreSQL e storage de arquivos MinIO, tudo rodando em containers Docker.
 
 ## Funcionalidades
 
+- **Login** com e-mail e senha ou com **Google**, sessão com JWT e gestão de usuários (administrador e operador)
 - Cadastro, edição e exclusão de empresas e pessoas, com formulários organizados em abas
 - **Soft delete**: registros excluídos saem das listagens, mas continuam no banco e podem ser restaurados
 - **Auditoria**: toda inclusão, edição, exclusão e restauração registra quem fez, quando, de qual IP e o que mudou
@@ -28,10 +29,62 @@ pelo filtro **Excluídos** da listagem.
 Cada ação grava uma linha na tabela `auditoria`, na mesma transação da alteração, com o registro antes
 e depois da mudança. Essa tabela é protegida por um trigger no banco: **não aceita UPDATE nem DELETE**.
 
-O operador é identificado no primeiro acesso e enviado à API no cabeçalho `X-Usuario`. Alterações sem
-operador são recusadas (`401`).
+O autor de cada ação vem do usuário logado (nome e id, tirados do token). Logins, saídas, tentativas
+recusadas e trocas de senha também ficam na auditoria.
 
-Hard delete não é usado: todos os dados do sistema hoje são de cadastro e precisam ser rastreáveis.
+Hard delete só é usado para sessões vencidas há mais de 30 dias, que não têm valor de auditoria
+(os logins já estão registrados na tabela `auditoria`).
+
+## Autenticação e segurança
+
+**Como a sessão funciona**
+
+1. No login (senha ou Google), a API devolve um **token de acesso (JWT)** válido por 15 minutos e grava um
+   **refresh token** num cookie.
+2. O front guarda o token de acesso **só na memória** (nunca no `localStorage`) e o envia em toda
+   requisição: `Authorization: Bearer <token>`.
+3. Quando o token está para vencer, o front chama `/api/auth/renovar`. A API confere o cookie, troca o
+   refresh token por um novo (**rotação**) e entrega outro token de acesso. Ao recarregar a página, o
+   mesmo processo recupera a sessão sem pedir login.
+
+**Proteções**
+
+| Risco | Proteção |
+| --- | --- |
+| Senhas vazadas do banco | Hash com **scrypt** (parâmetros da OWASP: N=2^17, r=8, p=1) e sal aleatório |
+| Roubo de token por XSS | Token de acesso só na memória; refresh token em cookie **httpOnly**; CSP no nginx |
+| CSRF | Cookie **SameSite=Strict**, restrito a `/api/auth`, e cabeçalho `X-Requested-With` obrigatório |
+| Token roubado reutilizado | Refresh token trocado a cada uso; reuso de um token antigo **derruba todas as sessões** do usuário |
+| Token forjado ou adulterado | JWT assinado (HS256), com emissor, destinatário e validade conferidos; `alg: none` recusado |
+| Força bruta | Limite de 10 tentativas de login falhas a cada 15 minutos por IP |
+| Descobrir quais e-mails existem | Mesma mensagem e mesmo tempo de resposta para e-mail inexistente ou senha errada |
+| Acesso indevido | Todas as rotas exigem login; gestão de usuários só para administradores |
+| Senha padrão esquecida | Senhas criadas pelo administrador são **provisórias**: a API bloqueia tudo até a troca |
+| Cabeçalhos inseguros | `helmet` na API; CSP, `X-Frame-Options`, `Referrer-Policy` e outros no nginx |
+
+**Primeiro acesso:** se não houver usuários, a API cria um administrador com `ADMIN_EMAIL` e
+`ADMIN_PASSWORD` (do arquivo `.env`). Se `ADMIN_PASSWORD` estiver vazio, a senha é gerada e aparece
+no log da API (`docker compose logs api`). No primeiro login o sistema exige a troca da senha.
+
+**Login com Google:** só entra quem já foi cadastrado por um administrador (pelo e-mail). O token do
+Google é validado na API com a biblioteca oficial (assinatura, destinatário, validade e e-mail
+verificado). Para ativar:
+
+1. No [Google Cloud Console](https://console.cloud.google.com/apis/credentials), crie um projeto e
+   configure a **tela de consentimento OAuth** (tipo "Externo", modo de teste já serve).
+2. Em **Credenciais → Criar credenciais → ID do cliente OAuth**, escolha **Aplicativo da Web**.
+3. Em **Origens JavaScript autorizadas**, adicione `http://localhost:3000` e `http://localhost`.
+4. Copie o **Client ID** para `GOOGLE_CLIENT_ID` no `.env` e rode `docker compose up -d`.
+   O botão "Fazer login com o Google" aparece sozinho na tela de login.
+
+**Variáveis de ambiente** (veja `.env.example`):
+
+| Variável | Para que serve |
+| --- | --- |
+| `JWT_SECRET` | Segredo que assina os tokens. Use um valor aleatório e longo |
+| `ADMIN_EMAIL` / `ADMIN_PASSWORD` | Primeiro administrador (só quando não há usuários) |
+| `GOOGLE_CLIENT_ID` | Liga o login com Google |
+| `COOKIE_SECURE` | `true` em produção, com HTTPS |
 
 ## Documentos (MinIO)
 
@@ -60,6 +113,7 @@ O painel web do MinIO fica em http://localhost:9001 (usuário `minioadmin`, senh
 | --- | --- |
 | Front-end | React 19, CSS próprio (sem framework de UI) |
 | API | Node.js, Express 5, `pg` |
+| Autenticação | JWT (`jsonwebtoken`), scrypt (nativo do Node), Google Identity Services (`google-auth-library`), `helmet`, `express-rate-limit` |
 | Banco | PostgreSQL 16 |
 | Arquivos | MinIO (compatível com S3), `minio` e `multer` na API |
 | Infra | Docker, Docker Compose, Nginx |
@@ -69,12 +123,18 @@ O painel web do MinIO fica em http://localhost:9001 (usuário `minioadmin`, senh
 ```
 ├── src/                  # Front-end React
 │   ├── cadastros/        # Configuração dos formulários (campos, abas, colunas da lista)
-│   ├── paginas/          # Painel, listagem, formulário e auditoria
+│   ├── paginas/          # Login, painel, listagem, formulário, auditoria e usuários
 │   ├── components/       # Componentes reutilizáveis (modal, histórico, campos, ícones)
 │   ├── utils/            # Máscaras, validações, formatação e consultas de CEP/CNPJ
+│   ├── sessao.js         # Token de acesso em memória e renovação automática
 │   └── api.js            # Chamadas à API
 ├── api/                  # API Node.js/Express
-│   ├── server.js         # Configuração, auditoria e tratamento de erros
+│   ├── server.js         # Configuração, segurança, auditoria e tratamento de erros
+│   ├── auth.js           # Login (senha e Google), sessões, renovação e proteção das rotas
+│   ├── usuarios.js       # Gestão de usuários (administrador)
+│   ├── senhas.js         # Hash e regras de senha (scrypt)
+│   ├── tokens.js         # JWT de acesso e refresh tokens
+│   ├── test/             # Testes de segurança (node --test)
 │   ├── cadastros.js      # Rotas de cadastro (CRUD com soft delete e auditoria)
 │   ├── documentos.js     # Rotas de documentos (envio, download, remoção e restauração)
 │   ├── storage.js        # Conexão com o MinIO
@@ -92,6 +152,7 @@ O painel web do MinIO fica em http://localhost:9001 (usuário `minioadmin`, senh
 Pré-requisito: [Docker Desktop](https://www.docker.com/products/docker-desktop/) aberto.
 
 ```bash
+cp .env.example .env   # defina JWT_SECRET e os dados do primeiro administrador
 docker compose up -d --build
 ```
 
@@ -133,7 +194,17 @@ Para parar **e apagar os dados** (banco e arquivos): `docker compose down -v`.
 
 | Método | Rota | Descrição |
 | --- | --- | --- |
-| GET | `/api/health` | Verifica se a API e o banco estão no ar |
+| GET | `/api/health` | Verifica se a API e o banco estão no ar (público) |
+| GET | `/api/auth/config` | Diz se o login com Google está ligado (público) |
+| POST | `/api/auth/login` | Login com e-mail e senha (público) |
+| POST | `/api/auth/google` | Login com o ID token do Google (público) |
+| POST | `/api/auth/renovar` | Troca o refresh token (cookie) por um novo token de acesso |
+| POST | `/api/auth/sair` | Encerra a sessão |
+| GET | `/api/auth/eu` | Dados do usuário logado |
+| POST | `/api/auth/trocar-senha` | Troca a senha do usuário logado |
+| GET/POST | `/api/usuarios` | Lista e cria usuários (administrador) |
+| PUT | `/api/usuarios/:id` | Edita nome, perfil e situação (administrador) |
+| POST | `/api/usuarios/:id/redefinir-senha` | Define uma senha provisória (administrador) |
 | GET | `/api/{cadastro}` | Lista ativos (`?status=excluidos` para excluídos) |
 | GET | `/api/{cadastro}/:id` | Detalhe |
 | GET | `/api/{cadastro}/:id/historico` | Histórico de auditoria do registro |
@@ -150,14 +221,16 @@ Para parar **e apagar os dados** (banco e arquivos): `docker compose down -v`.
 | GET | `/api/auditoria` | Todas as ações (filtros: `entidade`, `acao`, `usuario`, `pagina`) |
 | GET | `/api/resumo` | Totais exibidos no painel |
 
-`{cadastro}` é `empresas` ou `pessoas`. Toda alteração exige o cabeçalho `X-Usuario`.
+`{cadastro}` é `empresas` ou `pessoas`. Fora as rotas públicas, todas exigem
+`Authorization: Bearer <token>`.
 
-Respostas de erro: `400` (dados inválidos, com `erros` por campo), `401` (operador não informado),
-`404` (não encontrado), `409` (CPF/CNPJ duplicado ou registro excluído), `500` (erro interno),
-`503` (storage de arquivos indisponível).
+Respostas de erro: `400` (dados inválidos, com `erros` por campo), `401` (sem login ou token vencido),
+`403` (sem permissão ou senha provisória), `404` (não encontrado), `409` (duplicado ou registro excluído),
+`429` (muitas tentativas), `500` (erro interno), `503` (storage de arquivos indisponível).
 
 ## Testes
 
 ```bash
-npm test
+npm test              # front-end
+cd api && npm test    # API: testes de segurança (senhas e tokens)
 ```
