@@ -112,6 +112,19 @@ app.use('/api/empresas', rotasCadastro({
   pool,
   tabela: 'empresas',
   regras: REGRAS_EMPRESA,
+  busca: {
+    texto: ['t.nome', 't.nome_fantasia', 't.email', 't.cidade'],
+    digitos: ['t.cnpj', 't.telefone', 't.celular', 't.cep'],
+  },
+  ordenacao: {
+    nome: 'COALESCE(t.nome_fantasia, t.nome)',
+    cnpj: 't.cnpj',
+    cidade: 't.cidade',
+    documentos: 'total_documentos',
+    criado: 't.criado_em',
+    excluido: 't.excluido_em',
+  },
+  opcoes: ['t.nome_fantasia', 't.nome'],
   // Junto com a empresa vem a quantidade de documentos e se falta o Cartão CNPJ
   consulta: `SELECT t.*,
                (SELECT COUNT(*) FROM documentos d
@@ -132,6 +145,18 @@ app.use('/api/pessoas', rotasCadastro({
   pool,
   tabela: 'pessoas',
   regras: REGRAS_PESSOA,
+  busca: {
+    texto: ['t.nome', 't.nome_social', 't.email', 't.profissao', 't.cargo', 'e.nome', 'e.nome_fantasia'],
+    digitos: ['t.cpf', 't.telefone', 't.celular'],
+  },
+  ordenacao: {
+    nome: 'COALESCE(t.nome_social, t.nome)',
+    cpf: 't.cpf',
+    nascimento: 't.data_nascimento',
+    profissao: 't.profissao',
+    criado: 't.criado_em',
+    excluido: 't.excluido_em',
+  },
   consulta: `SELECT t.*, COALESCE(e.nome_fantasia, e.nome) AS empresa_nome
              FROM pessoas t LEFT JOIN empresas e ON e.id = t.empresa_id`,
   // A empresa vinculada precisa existir e estar ativa

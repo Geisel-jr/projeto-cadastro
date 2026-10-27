@@ -65,7 +65,7 @@ const pessoa = {
           tipo: 'select',
           col: 4,
           carregarOpcoes: async () =>
-            (await api.listar('empresas')).map((e) => ({ valor: String(e.id), label: e.nomeFantasia || e.nome })),
+            (await api.opcoes('empresas')).map((e) => ({ valor: String(e.id), label: e.nome })),
           exibir: (valor, registro) => (valor ? registro?.empresaNome || `#${valor}` : '—'),
         },
         { nome: 'cargo', max: 100, label: 'Cargo', col: 4 },
@@ -90,11 +90,10 @@ const pessoa = {
     profissao: dados.profissao === 'Outros' ? dados.profissaoOutra.trim() : dados.profissao,
   }),
 
-  busca: ['nome', 'nomeSocial', 'cpf', 'email', 'profissao', 'empresaNome'],
-
   colunas: [
     {
       titulo: 'Pessoa',
+      ordem: 'nome',
       render: (p) => (
         <div className="celula-nome">
           <span className="avatar verde">{iniciais(p.nome)}</span>
@@ -105,10 +104,11 @@ const pessoa = {
         </div>
       ),
     },
-    { titulo: 'CPF', render: (p) => <span className="mono">{mascaraCPF(p.cpf)}</span> },
+    { titulo: 'CPF', ordem: 'cpf', render: (p) => <span className="mono">{mascaraCPF(p.cpf)}</span> },
     { titulo: 'Telefone', render: (p) => mascaraTelefone(p.celular || p.telefone) },
     {
       titulo: 'Nascimento',
+      ordem: 'nascimento',
       render: (p) => (
         <div className="celula-dupla">
           <span>{formatarData(p.dataNascimento)}</span>
@@ -118,6 +118,7 @@ const pessoa = {
     },
     {
       titulo: 'Profissão',
+      ordem: 'profissao',
       render: (p) => (
         <div className="celula-dupla">
           <span><span className="badge-profissao">{p.profissao}</span></span>

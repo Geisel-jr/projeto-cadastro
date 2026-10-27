@@ -102,7 +102,7 @@ jobs:
             -d '{"nome":"Empresa CI Editada","cnpj":"11222333000181","email":"ci@teste.com","telefone":"1133334444","cep":"01001000","porte":"ME"}')" 200
           esperar "Exclusão sem motivo retorna 400" "$(status -X DELETE $URL/empresas/1 -H "$J" -H "$U" -d '{}')" 400
           esperar "Exclusão com motivo retorna 200" "$(status -X DELETE $URL/empresas/1 -H "$J" -H "$U" -d '{"motivo":"Teste da CI"}')" 200
-          esperar "Registro excluído some dos ativos" "$(curl -s $URL/empresas -H "$U")" "[]"
+          esperar "Registro excluído some dos ativos" "$(curl -s $URL/empresas -H "$U" | grep -o '"total":[0-9]*')" '"total":0'
           esperar "Registro excluído continua no banco" "$(curl -s "$URL/empresas?status=excluidos" -H "$U" | grep -c 'Teste da CI')" 1
           esperar "Restauração retorna 200" "$(status -X POST $URL/empresas/1/restaurar -H "$U")" 200
           esperar "Auditoria registrou as 4 ações" "$(curl -s $URL/empresas/1/historico -H "$U" | grep -o '"acao"' | wc -l)" 4
@@ -134,6 +134,16 @@ jobs:
           esperar "Pessoa inválida retorna 400" "$(status -X POST $URL/pessoas -H "$J" -H "$U" -d '{"nome":"X"}')" 400
           esperar "Pessoa vinculada à empresa retorna 201" "$(status -X POST $URL/pessoas -H "$J" -H "$U" \
             -d '{"nome":"Maria da Silva","cpf":"12345678909","email":"maria@email.com","telefone":"31999990000","dataNascimento":"1995-04-20","profissao":"QA","empresaId":1}')" 201
+
+          # Paginação e busca no servidor
+          esperar "Lista paginada informa o total" "$(curl -s "$URL/empresas?limite=1" -H "$U" | grep -o '"total":[0-9]*')" '"total":1'
+          esperar "Busca sem acento" "$(curl -s "$URL/empresas?q=empresa%20ci%20editada" -H "$U" | grep -o '"total":[0-9]*')" '"total":1'
+          esperar "Busca sem resultado" "$(curl -s "$URL/empresas?q=inexistente" -H "$U" | grep -o '"total":[0-9]*')" '"total":0'
+
+          # Backup: gera a cópia do banco e espelha os arquivos
+          docker compose exec -T backup backup.sh agora
+          esperar "Backup do banco gerado" "$(ls backups/banco/*.dump 2>/dev/null | head -1 | grep -c '.dump')" 1
+          esperar "Arquivos dos documentos espelhados" "$(find backups/arquivos -type f | wc -l | tr -d ' ')" 3
 
           esperar "Front envia o cabeçalho CSP" "$(curl -sI http://localhost:3000 | grep -ci 'content-security-policy')" 1
 

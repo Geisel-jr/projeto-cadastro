@@ -82,6 +82,30 @@ services:
       api:
         condition: service_healthy
 
+  # Backup automático do banco e dos arquivos na pasta ./backups do projeto.
+  # Fazer agora:  docker compose exec backup backup.sh agora
+  # Restaurar:    docker compose exec backup restaurar.sh
+  backup:
+    build: ./backup
+    restart: unless-stopped
+    environment:
+      PGHOST: db
+      PGUSER: ${DB_USER:-postgres}
+      PGPASSWORD: ${DB_PASSWORD:-postgres}
+      PGDATABASE: ${DB_NAME:-cadastros_db}
+      MINIO_HOST: minio
+      MINIO_USER: ${MINIO_USER:-minioadmin}
+      MINIO_PASSWORD: ${MINIO_PASSWORD:-minioadmin123}
+      MINIO_BUCKET: documentos
+      BACKUP_INTERVALO_HORAS: ${BACKUP_INTERVALO_HORAS:-24}
+      BACKUP_RETENCAO_DIAS: ${BACKUP_RETENCAO_DIAS:-7}
+      TZ: ${FUSO_HORARIO:-America/Sao_Paulo} # fuso usado no nome dos arquivos de backup
+    volumes:
+      - ./backups:/backups
+    depends_on:
+      api:
+        condition: service_healthy # a API cria as tabelas antes do primeiro backup
+
 volumes:
   db-data:
   minio-data:

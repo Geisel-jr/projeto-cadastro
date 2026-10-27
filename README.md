@@ -22,6 +22,9 @@ banco PostgreSQL e storage de arquivos MinIO, tudo rodando em containers Docker.
   (considera só a versão mais recente de cada documento), e aviso de vencidos na lista de empresas
 - **Endereços de página** (`/empresas/12`, `/pessoas?status=excluidos&q=maria`): o "voltar" do navegador
   funciona, recarregar mantém a página e os links podem ser compartilhados
+- **Listas paginadas no servidor**, com ordenação pelo cabeçalho das colunas e busca no banco que ignora
+  acentos ("pao" encontra "Pão") e aceita documentos formatados ou não
+- **Backup automático** diário do banco e dos arquivos, com restauração por comando
 - Layout responsivo (desktop e celular)
 
 ## Auditoria e exclusão
@@ -147,9 +150,10 @@ O painel web do MinIO fica em http://localhost:9001 (usuário `minioadmin`, senh
 │   ├── db.js             # Conexão e execução das migrations
 │   ├── util.js           # Funções comuns (transação, auditoria, erros HTTP)
 │   └── migrations/       # Scripts SQL de criação e evolução do banco
+├── backup/               # Imagem e scripts de backup e restauração (pg_dump + mc)
 ├── nginx.conf            # Servidor do front (repassa /api para a API)
 ├── dockerfile            # Imagem do front
-└── docker-compose.yml    # Sobe banco, storage, API e front juntos
+└── docker-compose.yml    # Sobe banco, storage, API, front e backup juntos
 ```
 
 ## Como rodar com Docker (recomendado)
@@ -176,6 +180,30 @@ docker compose down
 ```
 
 Para parar **e apagar os dados** (banco e arquivos): `docker compose down -v`.
+
+## Backup
+
+O container `backup` faz uma cópia ao subir e depois a cada 24 horas, na pasta `backups/` do projeto
+(fora do git):
+
+- `backups/banco/AAAA-MM-DD_HH-MM-SS.dump`: cópia completa do banco (`pg_dump`), inclusive a auditoria.
+  São guardadas as dos últimos 7 dias.
+- `backups/arquivos/`: espelho dos documentos do MinIO. Como os documentos nunca são apagados de
+  verdade (soft delete), o espelho só cresce e não é duplicado a cada cópia.
+
+Intervalo, retenção e fuso horário são configuráveis no `.env` (`BACKUP_INTERVALO_HORAS`,
+`BACKUP_RETENCAO_DIAS`, `FUSO_HORARIO`).
+
+```bash
+docker compose exec backup backup.sh agora      # faz um backup na hora
+docker compose exec backup restaurar.sh         # lista os backups disponíveis
+docker compose exec -e CONFIRMAR=sim backup restaurar.sh ultimo   # restaura o mais recente
+docker compose restart api                      # depois de restaurar
+```
+
+> A restauração **substitui todos os dados atuais** pelos do backup, inclusive a auditoria feita depois
+> dele. Por isso ela só roda com `CONFIRMAR=sim`. Para proteger contra a perda do computador, copie a
+> pasta `backups/` para outro lugar (um disco externo ou a nuvem).
 
 ## Como rodar sem Docker (desenvolvimento)
 
@@ -210,7 +238,8 @@ Para parar **e apagar os dados** (banco e arquivos): `docker compose down -v`.
 | GET/POST | `/api/usuarios` | Lista e cria usuários (administrador) |
 | PUT | `/api/usuarios/:id` | Edita nome, perfil e situação (administrador) |
 | POST | `/api/usuarios/:id/redefinir-senha` | Define uma senha provisória (administrador) |
-| GET | `/api/{cadastro}` | Lista ativos (`?status=excluidos` para excluídos) |
+| GET | `/api/{cadastro}` | Lista paginada: `?status=excluidos&q=texto&pagina=1&limite=20&ordem=nome&direcao=asc`. Devolve `{ itens, total, pagina, paginas, limite }` |
+| GET | `/api/empresas/opcoes` | Id e nome de todas as empresas ativas (campo de seleção no cadastro de pessoa) |
 | GET | `/api/{cadastro}/:id` | Detalhe |
 | GET | `/api/{cadastro}/:id/historico` | Histórico de auditoria do registro |
 | POST | `/api/{cadastro}` | Cadastra |

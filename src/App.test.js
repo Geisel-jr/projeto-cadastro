@@ -33,7 +33,8 @@ beforeEach(() => {
         itens: [{ id: 9, empresaId: 3, tipo: 'Alvará de Funcionamento', descricao: null, validade: '2026-01-10', diasRestantes: -5, empresaNome: 'Padaria Sol' }],
       });
     }
-    return resposta(200, []);
+    if (url.includes('/opcoes')) return resposta(200, []);
+    return resposta(200, { itens: [], total: 0, pagina: 1, paginas: 1, limite: 20 });
   });
 });
 
@@ -74,6 +75,25 @@ test('endereço inexistente mostra "Página não encontrada"', async () => {
   render(<App />);
   await preencherLogin();
   expect(await screen.findByRole('heading', { name: 'Página não encontrada' })).toBeInTheDocument();
+});
+
+test('lista pede a página e a busca da URL ao servidor e mostra a paginação', async () => {
+  window.history.pushState({}, '', '/empresas?q=p%C3%A3o&pagina=2');
+  const empresaFalsa = (id) => ({ id, nome: `Empresa ${id}`, cnpj: '11222333000181', email: 'a@b.com', telefone: '11988887777' });
+  const fetchPadrao = global.fetch;
+  global.fetch = jest.fn((url, opcoes) => (url.includes('/api/empresas?')
+    ? resposta(200, { itens: [empresaFalsa(21), empresaFalsa(22)], total: 57, pagina: 2, paginas: 3, limite: 20 })
+    : fetchPadrao(url, opcoes)));
+
+  render(<App />);
+  await preencherLogin();
+  expect(await screen.findByText('Empresa 21')).toBeInTheDocument();
+
+  const chamada = global.fetch.mock.calls.map(([url]) => url).find((url) => url.includes('/api/empresas?'));
+  expect(chamada).toContain('q=p%C3%A3o');
+  expect(chamada).toContain('pagina=2');
+  expect(screen.getByText('21–40')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Página 2' })).toHaveAttribute('aria-current', 'page');
 });
 
 test('login recusado mostra a mensagem da API', async () => {

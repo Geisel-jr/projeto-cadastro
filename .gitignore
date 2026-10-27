@@ -26,3 +26,6 @@ yarn-error.log*
 /api/node_modules
 /api/.env
 .env
+
+# backups locais (dados reais)
+/backups

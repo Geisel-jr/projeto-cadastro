@@ -4,7 +4,8 @@ const { paraSnake, linhaParaObjeto, emTransacao, registrarAuditoria, lerId, lerM
 
 // Cria as rotas de um cadastro (empresas ou pessoas):
 //
-//   GET    /                  lista (ativos, ou ?status=excluidos)
+//   GET    /                  lista paginada (?status=excluidos&q=&pagina=&limite=&ordem=&direcao=)
+//   GET    /opcoes            id e nome de todos os ativos (para campos de seleção)
 //   GET    /:id               detalhe
 //   GET    /:id/historico     histórico de auditoria do registro
 //   POST   /                  cria
@@ -13,7 +14,11 @@ const { paraSnake, linhaParaObjeto, emTransacao, registrarAuditoria, lerId, lerM
 //   POST   /:id/restaurar     desfaz a exclusão
 //
 // Toda alteração grava, na mesma transação, uma linha na tabela "auditoria".
-function rotasCadastro({ pool, tabela, regras, consulta, verificar }) {
+// Opções de listagem:
+//   busca:     { texto: [colunas comparadas sem acento], digitos: [colunas só com números] }
+//   ordenacao: { chave da URL: expressão SQL } — só estas colunas podem ser usadas para ordenar
+//   opcoes:    expressões SQL do "nome" devolvido em /opcoes
+function rotasCadastro({ pool, tabela, regras, consulta, verificar, busca, ordenacao, opcoes }) {
   const router = express.Router();
   const campos = regras.map((regra) => regra.campo);
   const colunas = campos.map(paraSnake);
@@ -41,10 +46,53 @@ function rotasCadastro({ pool, tabela, regras, consulta, verificar }) {
 
   router.get('/', async (req, res) => {
     const excluidos = req.query.status === 'excluidos';
-    const { rows } = await pool.query(
-      `${consulta} WHERE t.excluido_em IS ${excluidos ? 'NOT NULL ORDER BY t.excluido_em' : 'NULL ORDER BY t.id'} DESC`
+    const limite = Math.min(Math.max(Number(req.query.limite) || 20, 1), 100);
+    const condicoes = [`t.excluido_em IS ${excluidos ? 'NOT ' : ''}NULL`];
+    const parametros = [];
+
+    // Busca: texto sem acentos em várias colunas; números também nos documentos e telefones
+    const termo = String(req.query.q ?? '').trim().slice(0, 100);
+    if (termo && busca) {
+      parametros.push(`%${termo}%`);
+      const posicaoTexto = parametros.length;
+      const alternativas = busca.texto.map((coluna) => `unaccent(${coluna}) ILIKE unaccent($${posicaoTexto})`);
+      const digitos = termo.replace(/\D/g, '');
+      if (digitos.length >= 3 && busca.digitos?.length) {
+        parametros.push(`%${digitos}%`);
+        const posicaoDigitos = parametros.length;
+        alternativas.push(...busca.digitos.map((coluna) => `${coluna} LIKE $${posicaoDigitos}`));
+      }
+      condicoes.push(`(${alternativas.join(' OR ')})`);
+    }
+    const onde = `WHERE ${condicoes.join(' AND ')}`;
+
+    // Ordenação só por colunas permitidas (nada da URL entra direto no SQL)
+    const padrao = excluidos ? 't.excluido_em DESC' : 't.id DESC';
+    const coluna = ordenacao?.[req.query.ordem];
+    const direcao = req.query.direcao === 'desc' ? 'DESC' : 'ASC';
+    const ordem = coluna ? `${coluna} ${direcao} NULLS LAST, t.id DESC` : padrao;
+
+    const { rows: [{ total }] } = await pool.query(
+      `SELECT COUNT(*)::int AS total FROM (${consulta} ${onde}) filtrados`, parametros
     );
-    res.json(rows.map(linhaParaObjeto));
+    const paginas = Math.max(Math.ceil(total / limite), 1);
+    const pagina = Math.min(Math.max(Number(req.query.pagina) || 1, 1), paginas);
+
+    const { rows } = await pool.query(
+      `${consulta} ${onde} ORDER BY ${ordem} LIMIT ${limite} OFFSET ${(pagina - 1) * limite}`,
+      parametros
+    );
+    res.json({ itens: rows.map(linhaParaObjeto), total, pagina, paginas, limite });
+  });
+
+  // Lista curta (id e nome) de todos os ativos, para campos de seleção em outros formulários
+  router.get('/opcoes', async (req, res) => {
+    if (!opcoes) throw new ErroHttp(404, 'Não disponível.');
+    const { rows } = await pool.query(
+      `SELECT t.id, COALESCE(${opcoes.join(', ')}) AS nome FROM ${tabela} t
+       WHERE t.excluido_em IS NULL ORDER BY 2`
+    );
+    res.json(rows);
   });
 
   router.get('/:id', async (req, res) => {

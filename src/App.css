@@ -892,3 +892,45 @@ a.menu-item, a.marca { text-decoration: none; }
   .painel-colunas { grid-template-columns: minmax(0, 1fr); grid-template-areas: "vencimentos" "atividade"; }
   .painel-colunas .vencimentos { position: static; }
 }
+
+/* ==========================================================
+   Listagem: ordenação e paginação (feitas no servidor)
+   ========================================================== */
+.ordenar {
+  display: inline-flex; align-items: center; gap: .25rem;
+  margin: 0 -.35rem; padding: .2rem .35rem; border: 0; border-radius: var(--raio-p);
+  background: none; color: inherit; font: inherit;
+  transition: color var(--rapido) ease, background-color var(--rapido) ease;
+}
+.ordenar svg { opacity: 0; transition: opacity var(--rapido) ease, transform var(--medio) var(--ease-out); }
+.ordenar.ativa { color: var(--texto); }
+.ordenar.ativa svg { opacity: 1; }
+.ordenar svg.para-cima { transform: rotate(180deg); }
+
+/* Página seguinte carregando: a atual fica visível e esmaecida, sem piscar o esqueleto */
+.rolagem-x.recarregando { opacity: .55; transition: opacity var(--rapido) ease; pointer-events: none; }
+.toolbar-fim .spinner { width: 14px; height: 14px; color: var(--texto-3); }
+
+.paginacao {
+  display: flex; align-items: center; justify-content: space-between; gap: .75rem; flex-wrap: wrap;
+  padding: .55rem .75rem .55rem 1rem; border-top: 1px solid var(--borda);
+  color: var(--texto-3); font-size: 12.5px; font-variant-numeric: tabular-nums;
+}
+.paginacao-resumo strong { color: var(--texto-2); font-weight: 500; }
+.paginacao-botoes { display: flex; align-items: center; gap: .15rem; }
+.paginacao-botoes .btn-icone:disabled { opacity: .35; }
+.paginacao-numero {
+  min-width: 30px; height: 30px; padding: 0 .4rem; border: 0; border-radius: var(--raio-p);
+  background: none; color: var(--texto-2); font-size: 13px; font-variant-numeric: tabular-nums;
+  transition: background-color var(--rapido) ease, color var(--rapido) ease;
+}
+.paginacao-numero.atual { background: var(--texto); color: #fff; font-weight: 500; }
+.paginacao-reticencias { min-width: 20px; text-align: center; }
+.girar-180 { transform: rotate(180deg); }
+
+@media (hover: hover) {
+  .ordenar:hover { color: var(--texto); }
+  .ordenar:hover svg { opacity: .5; }
+  .ordenar.ativa:hover svg { opacity: 1; }
+  .paginacao-numero:not(.atual):hover { background: var(--hover); color: var(--texto); }
+}

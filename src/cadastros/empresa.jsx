@@ -50,11 +50,10 @@ const empresa = {
     },
   ],
 
-  busca: ['nome', 'nomeFantasia', 'cnpj', 'email', 'cidade'],
-
   colunas: [
     {
       titulo: 'Empresa',
+      ordem: 'nome',
       render: (e) => (
         <div className="celula-nome">
           <span className="avatar azul">{iniciais(e.nomeFantasia || e.nome)}</span>
@@ -65,7 +64,7 @@ const empresa = {
         </div>
       ),
     },
-    { titulo: 'CNPJ', render: (e) => <span className="mono">{mascaraCNPJ(e.cnpj)}</span> },
+    { titulo: 'CNPJ', ordem: 'cnpj', render: (e) => <span className="mono">{mascaraCNPJ(e.cnpj)}</span> },
     {
       titulo: 'Contato',
       render: (e) => (
@@ -77,6 +76,7 @@ const empresa = {
     },
     {
       titulo: 'Documentos',
+      ordem: 'documentos',
       render: (e) => (
         <div className="celula-dupla">
           <span>{e.totalDocumentos ?? 0} anexo(s)</span>
@@ -88,6 +88,7 @@ const empresa = {
     },
     {
       titulo: 'Cidade',
+      ordem: 'cidade',
       render: (e) => (e.cidade ? <>{e.cidade} <span className="badge-uf">{e.estado}</span></> : '—'),
     },
   ],

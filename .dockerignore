@@ -6,3 +6,5 @@ api
 .env
 .claude
 docker-compose.yml
+backup
+backups

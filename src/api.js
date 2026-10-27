@@ -35,7 +35,13 @@ async function requisicao(caminho, { metodo = 'GET', corpo, tentouRenovar = fals
 }
 
 export const api = {
-  listar: (entidade, status = 'ativos') => requisicao(`/${entidade}?status=${status}`),
+  // filtros: { status, q, pagina, limite, ordem, direcao } — valores vazios não vão na URL
+  listar: (entidade, filtros = {}) => {
+    const busca = new URLSearchParams(Object.entries(filtros).filter(([, v]) => v !== '' && v != null));
+    return requisicao(`/${entidade}?${busca}`);
+  },
+  // id e nome de todos os ativos (para campos de seleção)
+  opcoes: (entidade) => requisicao(`/${entidade}/opcoes`),
   obter: (entidade, id) => requisicao(`/${entidade}/${id}`),
   historico: (entidade, id) => requisicao(`/${entidade}/${id}/historico`),
   criar: (entidade, dados) => requisicao(`/${entidade}`, { metodo: 'POST', corpo: dados }),
