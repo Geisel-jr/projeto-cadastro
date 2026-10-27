@@ -5,6 +5,7 @@ import Icone from '../components/Icone';
 import Modal from '../components/Modal';
 import { Avatar } from '../components/MenuUsuario';
 import { formatarDataHora } from '../utils/formatadores';
+import { useTituloPagina } from '../rotas';
 
 const PAPEIS = { admin: 'Administrador', operador: 'Operador' };
 
@@ -27,6 +28,7 @@ function descreverAcesso(u) {
 
 // Gestão de usuários (somente administradores)
 export default function Usuarios({ usuarioAtual, notificar }) {
+  useTituloPagina('Usuários');
   const [lista, setLista] = useState(null);
   const [erro, setErro] = useState(null);
   const [editando, setEditando] = useState(null); // {} = novo usuário

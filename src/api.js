@@ -73,6 +73,7 @@ export const mensagemErro = (erro) =>
 
 export const documentos = {
   tipos: () => requisicao('/documentos/tipos'),
+  vencimentos: (dias = 30) => requisicao(`/documentos/vencimentos?dias=${dias}`),
   listar: (empresaId, status = 'ativos') => requisicao(`/empresas/${empresaId}/documentos?status=${status}`),
   remover: (empresaId, id, motivo) =>
     requisicao(`/empresas/${empresaId}/documentos/${id}`, { metodo: 'DELETE', corpo: { motivo } }),

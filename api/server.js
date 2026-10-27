@@ -76,6 +76,34 @@ app.get('/api/documentos/tipos', (req, res) => {
   });
 });
 
+// Documentos vencidos ou que vencem nos próximos N dias (padrão 30).
+// Considera só o documento mais recente de cada tipo por empresa: se a empresa já
+// anexou uma certidão nova e válida, a antiga (vencida) não gera alerta.
+app.get('/api/documentos/vencimentos', async (req, res) => {
+  const dias = Math.min(Math.max(Number(req.query.dias) || 30, 1), 365);
+  const { rows } = await pool.query(
+    `SELECT * FROM (
+       SELECT DISTINCT ON (d.empresa_id, d.tipo, COALESCE(d.descricao, ''))
+              d.id, d.empresa_id, d.tipo, d.descricao, d.validade, d.nome_arquivo,
+              COALESCE(e.nome_fantasia, e.nome) AS empresa_nome,
+              (d.validade - CURRENT_DATE) AS dias_restantes
+         FROM documentos d
+         JOIN empresas e ON e.id = d.empresa_id
+        WHERE d.excluido_em IS NULL AND e.excluido_em IS NULL AND d.validade IS NOT NULL
+        ORDER BY d.empresa_id, d.tipo, COALESCE(d.descricao, ''), d.validade DESC
+     ) recentes
+     WHERE validade <= CURRENT_DATE + $1::int
+     ORDER BY validade, empresa_nome`,
+    [dias]
+  );
+  res.json({
+    dias,
+    vencidos: rows.filter((r) => r.dias_restantes < 0).length,
+    aVencer: rows.filter((r) => r.dias_restantes >= 0).length,
+    itens: rows.map(linhaParaObjeto),
+  });
+});
+
 app.use('/api/empresas/:empresaId/documentos', rotasDocumentos({ pool }));
 
 // ========== CADASTROS ==========
@@ -89,7 +117,14 @@ app.use('/api/empresas', rotasCadastro({
                (SELECT COUNT(*) FROM documentos d
                  WHERE d.empresa_id = t.id AND d.excluido_em IS NULL)::int AS total_documentos,
                NOT EXISTS (SELECT 1 FROM documentos d
-                 WHERE d.empresa_id = t.id AND d.excluido_em IS NULL AND d.tipo = 'Cartão CNPJ') AS falta_cartao_cnpj
+                 WHERE d.empresa_id = t.id AND d.excluido_em IS NULL AND d.tipo = 'Cartão CNPJ') AS falta_cartao_cnpj,
+               -- documentos vencidos sem uma versão mais nova e válida do mesmo tipo
+               (SELECT COUNT(*) FROM documentos d
+                 WHERE d.empresa_id = t.id AND d.excluido_em IS NULL AND d.validade < CURRENT_DATE
+                   AND NOT EXISTS (SELECT 1 FROM documentos n
+                     WHERE n.empresa_id = d.empresa_id AND n.excluido_em IS NULL AND n.tipo = d.tipo
+                       AND COALESCE(n.descricao, '') = COALESCE(d.descricao, '')
+                       AND n.validade > d.validade))::int AS documentos_vencidos
              FROM empresas t`,
 }));
 

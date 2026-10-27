@@ -849,3 +849,46 @@ img.avatar { object-fit: cover; }
   .login-marca-movel .marca-nome { display: inline; }
   .login-area { align-items: start; padding-top: 12vh; }
 }
+
+/* Links do topo (o menu passou a ser de links, para abrir em outra aba e funcionar com o "voltar") */
+a.menu-item, a.marca { text-decoration: none; }
+.nao-encontrada h1 { font-size: 18px; font-weight: 600; color: var(--texto); }
+
+/* ==========================================================
+   Painel: atividade + documentos a vencer
+   ========================================================== */
+.painel-colunas {
+  display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: .75rem; align-items: start;
+  grid-template-areas: "atividade vencimentos";
+}
+.painel-colunas .atividade { grid-area: atividade; }
+.painel-colunas .vencimentos { grid-area: vencimentos; position: sticky; top: 72px; }
+
+.vencimentos-totais { display: flex; gap: .35rem; }
+.lista-vencimentos { max-height: 440px; overflow-y: auto; border-radius: 0 0 var(--raio-g) var(--raio-g); }
+.lista-vencimentos li + li { border-top: 1px solid var(--borda); }
+.vencimento {
+  display: flex; align-items: center; gap: .75rem;
+  padding: .65rem 1rem; color: inherit; text-decoration: none;
+  transition: background-color var(--rapido) ease;
+}
+.vencimento:focus-visible { border-radius: 0; box-shadow: inset 0 0 0 2px rgba(41, 82, 204, .35); }
+.vencimento-info { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.vencimento-info strong { font-size: 13.5px; font-weight: 500; }
+.vencimento-info small, .vencimento-prazo small { color: var(--texto-3); font-size: 12px; }
+.vencimento-prazo {
+  flex-shrink: 0; display: flex; flex-direction: column; align-items: flex-end; gap: .15rem;
+  font-variant-numeric: tabular-nums;
+}
+.vencimentos-vazio { display: flex; align-items: center; gap: .75rem; padding: 1rem; color: var(--texto-2); font-size: 13.5px; }
+.estado-icone.sucesso { width: 36px; height: 36px; flex-shrink: 0; background: var(--sucesso-suave); color: var(--sucesso); }
+.texto-perigo { color: var(--perigo); }
+
+@media (hover: hover) {
+  .vencimento:hover { background: var(--superficie-2); }
+}
+@media (max-width: 980px) {
+  /* No celular os vencimentos vêm primeiro: são o que pede ação */
+  .painel-colunas { grid-template-columns: minmax(0, 1fr); grid-template-areas: "vencimentos" "atividade"; }
+  .painel-colunas .vencimentos { position: static; }
+}

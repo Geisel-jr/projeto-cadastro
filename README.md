@@ -18,6 +18,10 @@ banco PostgreSQL e storage de arquivos MinIO, tudo rodando em containers Docker.
 - Vínculo entre pessoa e empresa
 - Busca nas listagens e filtro de ativos/excluídos
 - Migrations automáticas do banco
+- **Alertas de vencimento** no painel: documentos vencidos ou que vencem nos próximos 30 dias
+  (considera só a versão mais recente de cada documento), e aviso de vencidos na lista de empresas
+- **Endereços de página** (`/empresas/12`, `/pessoas?status=excluidos&q=maria`): o "voltar" do navegador
+  funciona, recarregar mantém a página e os links podem ser compartilhados
 - Layout responsivo (desktop e celular)
 
 ## Auditoria e exclusão
@@ -111,7 +115,7 @@ O painel web do MinIO fica em http://localhost:9001 (usuário `minioadmin`, senh
 
 | Camada | Tecnologia |
 | --- | --- |
-| Front-end | React 19, CSS próprio (sem framework de UI) |
+| Front-end | React 19, React Router 7, CSS próprio (sem framework de UI) |
 | API | Node.js, Express 5, `pg` |
 | Autenticação | JWT (`jsonwebtoken`), scrypt (nativo do Node), Google Identity Services (`google-auth-library`), `helmet`, `express-rate-limit` |
 | Banco | PostgreSQL 16 |
@@ -127,6 +131,7 @@ O painel web do MinIO fica em http://localhost:9001 (usuário `minioadmin`, senh
 │   ├── components/       # Componentes reutilizáveis (modal, histórico, campos, ícones)
 │   ├── utils/            # Máscaras, validações, formatação e consultas de CEP/CNPJ
 │   ├── sessao.js         # Token de acesso em memória e renovação automática
+│   ├── rotas.js          # Endereços das páginas e título da aba
 │   └── api.js            # Chamadas à API
 ├── api/                  # API Node.js/Express
 │   ├── server.js         # Configuração, segurança, auditoria e tratamento de erros
@@ -218,6 +223,7 @@ Para parar **e apagar os dados** (banco e arquivos): `docker compose down -v`.
 | DELETE | `/api/empresas/:id/documentos/:doc` | Remove o documento (soft delete); corpo: `{ "motivo": "..." }` |
 | POST | `/api/empresas/:id/documentos/:doc/restaurar` | Restaura um documento removido |
 | GET | `/api/documentos/tipos` | Tipos de documento e formatos aceitos |
+| GET | `/api/documentos/vencimentos` | Documentos vencidos ou a vencer (`?dias=30`, de 1 a 365) |
 | GET | `/api/auditoria` | Todas as ações (filtros: `entidade`, `acao`, `usuario`, `pagina`) |
 | GET | `/api/resumo` | Totais exibidos no painel |
 

@@ -1,16 +1,32 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router';
 import { api, mensagemErro } from '../api';
+import { useTituloPagina } from '../rotas';
 import Icone from '../components/Icone';
 import ModalExclusao from '../components/ModalExclusao';
 import { formatarDataHora } from '../utils/formatadores';
 
 // Listagem de um cadastro, com busca, filtro Ativos/Excluídos e ações por linha.
 export default function ListaCadastro({ config, onNavegar, notificar }) {
-  const [status, setStatus] = useState('ativos');
+  useTituloPagina(config.plural);
+  // Filtro e busca ficam na URL (?status=excluidos&q=texto): voltar e compartilhar o link preservam a tela
+  const [parametros, setParametros] = useSearchParams();
+  const status = parametros.get('status') === 'excluidos' ? 'excluidos' : 'ativos';
+  const filtro = parametros.get('q') || '';
+  const alterarParametro = (nome, valor, substituir) => {
+    setParametros((atuais) => {
+      const novos = new URLSearchParams(atuais);
+      if (valor) novos.set(nome, valor);
+      else novos.delete(nome);
+      return novos;
+    }, { replace: substituir });
+  };
+  const setStatus = (valor) => alterarParametro('status', valor === 'excluidos' ? valor : null, false);
+  // Digitar na busca não enche o histórico do navegador
+  const setFiltro = (valor) => alterarParametro('q', valor, true);
   const [itens, setItens] = useState([]);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState(null);
-  const [filtro, setFiltro] = useState('');
   const [excluindo, setExcluindo] = useState(null);
   const campoBusca = useRef(null);
 

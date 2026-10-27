@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { BrowserRouter, Link, Route, Routes, useLocation, useNavigate, useParams } from 'react-router';
 import './App.css';
 import { CADASTROS } from './cadastros';
 import Icone from './components/Icone';
@@ -9,30 +10,42 @@ import Auditoria from './paginas/Auditoria';
 import FormularioCadastro from './paginas/FormularioCadastro';
 import ListaCadastro from './paginas/ListaCadastro';
 import Login from './paginas/Login';
+import NaoEncontrada from './paginas/NaoEncontrada';
 import Painel from './paginas/Painel';
 import Usuarios from './paginas/Usuarios';
+import { caminhoDe } from './rotas';
 import { aoEncerrarSessao, restaurarSessao, sair } from './sessao';
 
 const MENU = [
-  { id: 'painel', label: 'Painel', icone: 'home', rota: { pagina: 'painel' } },
-  { id: 'empresas', label: 'Empresas', icone: 'empresa', rota: { pagina: 'lista', entidade: 'empresas' } },
-  { id: 'pessoas', label: 'Pessoas', icone: 'pessoa', rota: { pagina: 'lista', entidade: 'pessoas' } },
-  { id: 'auditoria', label: 'Auditoria', icone: 'escudo', rota: { pagina: 'auditoria' } },
-  { id: 'usuarios', label: 'Usuários', icone: 'usuarios', rota: { pagina: 'usuarios' }, papel: 'admin' },
+  { id: 'painel', label: 'Painel', icone: 'home', caminho: '/' },
+  { id: 'empresas', label: 'Empresas', icone: 'empresa', caminho: '/empresas' },
+  { id: 'pessoas', label: 'Pessoas', icone: 'pessoa', caminho: '/pessoas' },
+  { id: 'auditoria', label: 'Auditoria', icone: 'escudo', caminho: '/auditoria' },
+  { id: 'usuarios', label: 'Usuários', icone: 'usuarios', caminho: '/usuarios', papel: 'admin' },
 ];
 
 const DURACAO_AVISO = 4500;
 const DURACAO_SAIDA = 150; // igual à animação "sair-toast" do CSS
 
-function App() {
+// Formulário de um cadastro a partir da URL: /empresas/nova ou /empresas/12
+function RotaFormulario({ entidade, ...props }) {
+  const { id } = useParams();
+  if (id !== undefined && !/^[1-9]\d*$/.test(id)) return <NaoEncontrada />;
+  const numero = id && Number(id);
+  return (
+    <FormularioCadastro key={`${entidade}-${numero || 'novo'}`} config={CADASTROS[entidade]} id={numero} {...props} />
+  );
+}
+
+function Aplicacao() {
   // estado: 'carregando' (verificando a sessão) | 'anonima' (tela de login) | 'ativa'
   const [sessao, setSessao] = useState({ estado: 'carregando', usuario: null });
-  // rota = { pagina: 'painel' | 'lista' | 'form' | 'auditoria' | 'usuarios', entidade?, id? }
-  const [rota, setRota] = useState({ pagina: 'painel' });
   const [trocandoSenha, setTrocandoSenha] = useState(false);
   const [notificacoes, setNotificacoes] = useState([]);
   const estadoAtual = useRef(sessao.estado);
   estadoAtual.current = sessao.estado;
+  const navigate = useNavigate();
+  const { pathname } = useLocation();
 
   // Marca o aviso como "saindo" (anima) e depois o remove
   const fecharNotificacao = useCallback((id) => {
@@ -60,15 +73,19 @@ function App() {
     });
   }, [notificar]);
 
-  const navegar = useCallback((novaRota) => {
-    setRota(novaRota);
+  // Cada página nova começa do topo
+  useEffect(() => {
     window.scrollTo?.(0, 0);
-  }, []);
+  }, [pathname]);
 
-  const aoEntrar = (usuario) => {
-    setRota({ pagina: 'painel' });
-    setSessao({ estado: 'ativa', usuario });
-  };
+  // As páginas pedem navegação com { pagina, entidade, id }; "substituir" não cria
+  // uma entrada nova no histórico (ex: de /empresas/nova para /empresas/12 após salvar)
+  const navegar = useCallback((rota) => {
+    navigate(caminhoDe(rota), { replace: Boolean(rota.substituir) });
+  }, [navigate]);
+
+  // Depois do login, continua no endereço que a pessoa tinha aberto
+  const aoEntrar = (usuario) => setSessao({ estado: 'ativa', usuario });
 
   const encerrar = async () => {
     try {
@@ -78,6 +95,7 @@ function App() {
     }
     setTrocandoSenha(false);
     setSessao({ estado: 'anonima', usuario: null });
+    navigate('/');
     notificar('sucesso', 'Você saiu do sistema');
   };
 
@@ -107,9 +125,9 @@ function App() {
 
   const { usuario } = sessao;
   const senhaProvisoria = usuario.deveTrocarSenha;
+  const admin = usuario.papel === 'admin';
   const props = { onNavegar: navegar, notificar };
-  const config = CADASTROS[rota.entidade];
-  const menuAtivo = rota.entidade || rota.pagina;
+  const secao = pathname.split('/')[1] || 'painel';
   const menu = MENU.filter((item) => !item.papel || item.papel === usuario.papel);
 
   return (
@@ -117,23 +135,23 @@ function App() {
       <a className="pular" href="#conteudo">Pular para o conteúdo</a>
       <header className="topbar">
         <div className="container topbar-inner">
-          <button className="marca" onClick={() => navegar({ pagina: 'painel' })}>
+          <Link className="marca" to="/">
             <span className="marca-logo" aria-hidden="true" />
             <span className="marca-nome">Cadastro<strong>Hub</strong></span>
-          </button>
+          </Link>
 
           <nav className="menu">
             {menu.map((item) => (
-              <button
+              <Link
                 key={item.id}
-                className={`menu-item ${menuAtivo === item.id ? 'ativo' : ''}`}
-                onClick={() => navegar(item.rota)}
+                to={item.caminho}
+                className={`menu-item ${secao === item.id ? 'ativo' : ''}`}
                 title={item.label}
-                aria-current={menuAtivo === item.id ? 'page' : undefined}
+                aria-current={secao === item.id ? 'page' : undefined}
               >
                 <Icone nome={item.icone} tamanho={16} />
                 <span>{item.label}</span>
-              </button>
+              </Link>
             ))}
           </nav>
 
@@ -144,13 +162,20 @@ function App() {
       {/* Com senha provisória a API bloqueia os dados; nada é carregado até a troca */}
       {!senhaProvisoria && (
         <main className="container conteudo" id="conteudo" tabIndex={-1}>
-          {rota.pagina === 'painel' && <Painel {...props} />}
-          {rota.pagina === 'auditoria' && <Auditoria {...props} />}
-          {rota.pagina === 'usuarios' && usuario.papel === 'admin' && <Usuarios usuarioAtual={usuario} {...props} />}
-          {rota.pagina === 'lista' && <ListaCadastro key={rota.entidade} config={config} {...props} />}
-          {rota.pagina === 'form' && (
-            <FormularioCadastro key={`${rota.entidade}-${rota.id || 'novo'}`} config={config} id={rota.id} {...props} />
-          )}
+          <Routes>
+            <Route path="/" element={<Painel {...props} />} />
+            {Object.keys(CADASTROS).map((entidade) => [
+              <Route key={entidade} path={`/${entidade}`}
+                element={<ListaCadastro key={entidade} config={CADASTROS[entidade]} {...props} />} />,
+              <Route key={`${entidade}-nova`} path={`/${entidade}/nova`}
+                element={<RotaFormulario entidade={entidade} {...props} />} />,
+              <Route key={`${entidade}-id`} path={`/${entidade}/:id`}
+                element={<RotaFormulario entidade={entidade} {...props} />} />,
+            ])}
+            <Route path="/auditoria" element={<Auditoria {...props} />} />
+            <Route path="/usuarios" element={admin ? <Usuarios usuarioAtual={usuario} {...props} /> : <NaoEncontrada />} />
+            <Route path="*" element={<NaoEncontrada />} />
+          </Routes>
         </main>
       )}
 
@@ -169,4 +194,10 @@ function App() {
   );
 }
 
-export default App;
+export default function App() {
+  return (
+    <BrowserRouter>
+      <Aplicacao />
+    </BrowserRouter>
+  );
+}

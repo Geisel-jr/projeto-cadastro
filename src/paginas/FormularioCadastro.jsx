@@ -16,6 +16,7 @@ import Icone from '../components/Icone';
 import ModalExclusao from '../components/ModalExclusao';
 import PainelDocumentos from '../components/PainelDocumentos';
 import { apenasDigitos, formatarDataHora, hojeISO } from '../utils/formatadores';
+import { useTituloPagina } from '../rotas';
 
 const capitalizar = (texto) => texto.charAt(0).toUpperCase() + texto.slice(1);
 
@@ -40,6 +41,7 @@ export default function FormularioCadastro({ config, id, onNavegar, notificar })
   const formulario = useRef(null);
 
   const excluido = Boolean(registro?.excluidoEm);
+  useTituloPagina(edicao ? (registro ? config.nomeExibicao(registro) : config.plural) : config.novo);
   const voltar = () => onNavegar({ pagina: 'lista', entidade: config.entidade });
 
   const exibirRegistro = useCallback((r) => {
@@ -159,7 +161,7 @@ export default function FormularioCadastro({ config, id, onNavegar, notificar })
         // Cadastros com documentos abrem a edição logo depois, para anexar os arquivos
         const novo = await api.criar(config.entidade, corpo);
         notificar('sucesso', `${capitalizar(config.singular)} cadastrada`, 'Agora você já pode anexar os documentos.');
-        onNavegar({ pagina: 'form', entidade: config.entidade, id: novo.id });
+        onNavegar({ pagina: 'form', entidade: config.entidade, id: novo.id, substituir: true });
       } else {
         await api.criar(config.entidade, corpo);
         notificar('sucesso', `${capitalizar(config.singular)} cadastrada`);

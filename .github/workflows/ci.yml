@@ -122,6 +122,15 @@ jobs:
           esperar "Restauração de anexo retorna 200" "$(status -X POST $URL/empresas/1/documentos/1/restaurar -H "$U")" 200
           esperar "Histórico da empresa inclui os anexos" "$(curl -s $URL/empresas/1/historico -H "$U" | grep -o '"acao"' | wc -l)" 7
 
+          # Vencimentos: documento vencido aparece; depois de anexar um novo e válido do mesmo tipo, some
+          printf 'Alvar\303\241 de Funcionamento' > "$PASTA/alvara.txt"   # "Alvará de Funcionamento" em UTF-8
+          status -X POST $URL/empresas/1/documentos -H "$U" -F "tipo=<$PASTA/alvara.txt" -F "validade=2020-01-01" \
+            -F "arquivo=@$PASTA/cartao.pdf;type=application/pdf" > /dev/null
+          esperar "Documento vencido aparece nos vencimentos" "$(curl -s $URL/documentos/vencimentos -H "$U" | grep -o '"vencidos":[0-9]*')" '"vencidos":1'
+          status -X POST $URL/empresas/1/documentos -H "$U" -F "tipo=<$PASTA/alvara.txt" -F "validade=2099-01-01" \
+            -F "arquivo=@$PASTA/cartao.pdf;type=application/pdf" > /dev/null
+          esperar "Documento substituído por um válido sai dos vencimentos" "$(curl -s $URL/documentos/vencimentos -H "$U" | grep -o '"vencidos":[0-9]*')" '"vencidos":0'
+
           esperar "Pessoa inválida retorna 400" "$(status -X POST $URL/pessoas -H "$J" -H "$U" -d '{"nome":"X"}')" 400
           esperar "Pessoa vinculada à empresa retorna 201" "$(status -X POST $URL/pessoas -H "$J" -H "$U" \
             -d '{"nome":"Maria da Silva","cpf":"12345678909","email":"maria@email.com","telefone":"31999990000","dataNascimento":"1995-04-20","profissao":"QA","empresaId":1}')" 201

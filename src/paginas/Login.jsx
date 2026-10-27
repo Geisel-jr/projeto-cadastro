@@ -6,6 +6,7 @@ import CampoSenha from '../components/CampoSenha';
 import Icone from '../components/Icone';
 import { entrar, entrarComGoogle } from '../sessao';
 import { corAvatar, iniciais } from '../utils/formatadores';
+import { useTituloPagina } from '../rotas';
 
 // Exemplo ilustrativo do histórico de auditoria, mostrado no painel da marca
 const EXEMPLO_HISTORICO = [
@@ -15,6 +16,7 @@ const EXEMPLO_HISTORICO = [
 ];
 
 export default function Login({ onEntrar }) {
+  useTituloPagina('Entrar');
   const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
   const [erro, setErro] = useState(null);

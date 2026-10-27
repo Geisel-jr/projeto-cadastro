@@ -2,11 +2,13 @@ import { useEffect, useState } from 'react';
 import { api, mensagemErro } from '../api';
 import Historico, { EsqueletoHistorico } from '../components/Historico';
 import Icone from '../components/Icone';
+import { useTituloPagina } from '../rotas';
 
 const LIMITE = 30;
 
 // Todas as ações registradas no sistema: quem fez, o quê, quando e de onde.
 export default function Auditoria({ onNavegar }) {
+  useTituloPagina('Auditoria');
   // Filtros e página ficam juntos: trocar um filtro sempre volta para a página 1
   const [consulta, setConsulta] = useState({ entidade: '', acao: '', usuario: '', pagina: 1 });
   const [usuarioDigitado, setUsuarioDigitado] = useState('');

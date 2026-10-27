@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
-import { api, mensagemErro } from '../api';
+import { api, documentos, mensagemErro } from '../api';
 import Historico, { EsqueletoHistorico } from '../components/Historico';
 import Icone from '../components/Icone';
+import Vencimentos from '../components/Vencimentos';
+import { useTituloPagina } from '../rotas';
 
 // "sábado, 11 de outubro" -> "Sábado, 11 de outubro"
 const hoje = () => {
@@ -10,15 +12,18 @@ const hoje = () => {
 };
 
 export default function Painel({ onNavegar }) {
+  useTituloPagina('Painel');
   const [resumo, setResumo] = useState(null);
   const [atividades, setAtividades] = useState(null);
+  const [vencimentos, setVencimentos] = useState(null);
   const [erro, setErro] = useState(null);
 
   useEffect(() => {
-    Promise.all([api.resumo(), api.auditoria({ limite: 8 })])
-      .then(([r, a]) => {
+    Promise.all([api.resumo(), api.auditoria({ limite: 8 }), documentos.vencimentos(30)])
+      .then(([r, a, v]) => {
         setResumo(r);
         setAtividades(a.itens);
+        setVencimentos(v);
       })
       .catch((e) => setErro(mensagemErro(e)));
   }, []);
@@ -81,15 +86,19 @@ export default function Painel({ onNavegar }) {
         ))}
       </div>
 
-      <div className="painel">
-        <div className="painel-header">
-          <h2>Atividade recente</h2>
-          <button className="btn-texto" onClick={() => onNavegar({ pagina: 'auditoria' })}>Ver tudo</button>
-        </div>
-        <div className="painel-corpo">
-          {atividades ? (
-            <Historico itens={atividades} mostrarRegistro onAbrir={(entidade, id) => onNavegar({ pagina: 'form', entidade, id })} />
-          ) : !erro && <EsqueletoHistorico />}
+      <div className="painel-colunas">
+        {!erro && <Vencimentos dados={vencimentos} />}
+
+        <div className="painel atividade">
+          <div className="painel-header">
+            <h2>Atividade recente</h2>
+            <button className="btn-texto" onClick={() => onNavegar({ pagina: 'auditoria' })}>Ver tudo</button>
+          </div>
+          <div className="painel-corpo">
+            {atividades ? (
+              <Historico itens={atividades} mostrarRegistro onAbrir={(entidade, id) => onNavegar({ pagina: 'form', entidade, id })} />
+            ) : !erro && <EsqueletoHistorico />}
+          </div>
         </div>
       </div>
     </>

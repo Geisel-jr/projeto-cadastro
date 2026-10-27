@@ -80,7 +80,9 @@ const empresa = {
       render: (e) => (
         <div className="celula-dupla">
           <span>{e.totalDocumentos ?? 0} anexo(s)</span>
-          {e.faltaCartaoCnpj && <small className="texto-alerta">Falta o cartão CNPJ</small>}
+          {e.documentosVencidos > 0
+            ? <small className="texto-perigo">{e.documentosVencidos} vencido{e.documentosVencidos > 1 ? 's' : ''}</small>
+            : e.faltaCartaoCnpj && <small className="texto-alerta">Falta o cartão CNPJ</small>}
         </div>
       ),
     },

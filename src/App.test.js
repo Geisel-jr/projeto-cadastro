@@ -19,6 +19,7 @@ const resposta = (status, corpo) => Promise.resolve({ ok: status < 400, status, 
 // Respostas falsas da API. "loginResponde" define o que o POST /auth/login devolve.
 let loginResponde;
 beforeEach(() => {
+  window.history.pushState({}, '', '/');
   loginResponde = () => resposta(200, { tokenAcesso: tokenFalso(), usuario: usuarioTeste });
   global.fetch = jest.fn((url) => {
     if (url.includes('/auth/renovar')) return resposta(401, { error: 'Sessão encerrada.' });
@@ -26,6 +27,12 @@ beforeEach(() => {
     if (url.includes('/auth/login')) return loginResponde();
     if (url.includes('/resumo')) return resposta(200, { empresas: 0, empresasExcluidas: 0, pessoas: 0, pessoasExcluidas: 0, acoesDia: 0 });
     if (url.includes('/auditoria')) return resposta(200, { itens: [], temMais: false });
+    if (url.includes('/documentos/vencimentos')) {
+      return resposta(200, {
+        dias: 30, vencidos: 1, aVencer: 0,
+        itens: [{ id: 9, empresaId: 3, tipo: 'Alvará de Funcionamento', descricao: null, validade: '2026-01-10', diasRestantes: -5, empresaNome: 'Padaria Sol' }],
+      });
+    }
     return resposta(200, []);
   });
 });
@@ -44,6 +51,29 @@ test('sem sessão, mostra a tela de login e entra no sistema', async () => {
   expect(await screen.findByRole('heading', { name: 'Painel' })).toBeInTheDocument();
   expect(screen.getByTitle('Ana Souza')).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: 'Usuários' })).not.toBeInTheDocument(); // operador não vê
+});
+
+test('painel mostra os documentos vencidos com link para a empresa', async () => {
+  render(<App />);
+  await preencherLogin();
+  const item = await screen.findByText('Alvará de Funcionamento');
+  expect(screen.getByText('Vencido há 5 dias')).toBeInTheDocument();
+  expect(item.closest('a')).toHaveAttribute('href', '/empresas/3');
+});
+
+test('link direto abre a página pedida depois do login', async () => {
+  window.history.pushState({}, '', '/pessoas');
+  render(<App />);
+  await preencherLogin();
+  expect(await screen.findByRole('heading', { name: 'Pessoas' })).toBeInTheDocument();
+  expect(document.title).toBe('Pessoas · CadastroHub');
+});
+
+test('endereço inexistente mostra "Página não encontrada"', async () => {
+  window.history.pushState({}, '', '/qualquer-coisa');
+  render(<App />);
+  await preencherLogin();
+  expect(await screen.findByRole('heading', { name: 'Página não encontrada' })).toBeInTheDocument();
 });
 
 test('login recusado mostra a mensagem da API', async () => {
