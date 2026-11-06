@@ -41,6 +41,12 @@ beforeEach(() => {
         : resposta(400, { error: 'Este link é inválido ou expirou.' });
     }
     if (url.includes('/auth/redefinir')) return resposta(200, { mensagem: 'Senha alterada.' });
+    if (url.includes('/auth/mfa')) {
+      const { codigo } = JSON.parse(opcoes?.body || '{}');
+      if (codigo === '123456') return resposta(200, { tokenAcesso: tokenFalso(), usuario: { ...usuarioTeste, papel: 'admin' } });
+      if (codigo === '999999') return resposta(410, { error: 'Este código expirou. Entre de novo para receber outro.' });
+      return resposta(401, { error: 'Código incorreto. Restam 4 tentativas.' });
+    }
     return resposta(200, { itens: [], total: 0, pagina: 1, paginas: 1, limite: 20 });
   });
 });
@@ -150,6 +156,38 @@ test('senha provisória exige a troca antes de mostrar o sistema', async () => {
   await preencherLogin();
   expect(await screen.findByText('Crie sua senha')).toBeInTheDocument();
   expect(screen.queryByRole('heading', { name: 'Painel' })).not.toBeInTheDocument();
+});
+
+const desafioFalso = { desafio: 'abc', email: 'an***@empresa.com', minutos: 10, reenviarEm: 30, reenvios: 2 };
+
+test('administrador confirma o login com o código enviado por e-mail', async () => {
+  loginResponde = () => resposta(200, { mfa: desafioFalso });
+  render(<App />);
+  await preencherLogin();
+
+  expect(await screen.findByRole('heading', { name: 'Confirme que é você' })).toBeInTheDocument();
+  expect(screen.getByText('an***@empresa.com')).toBeInTheDocument();
+  expect(screen.getByText(/peça outro código em 30s/)).toBeInTheDocument();
+
+  // código errado: mostra o erro e continua na mesma etapa
+  fireEvent.change(screen.getByLabelText('Código de acesso'), { target: { value: '000000' } });
+  expect(await screen.findByRole('alert')).toHaveTextContent('Código incorreto. Restam 4 tentativas.');
+
+  // código colado com espaço: ao completar os 6 números, confirma sozinho
+  fireEvent.change(screen.getByLabelText('Código de acesso'), { target: { value: '123 456' } });
+  expect(await screen.findByRole('heading', { name: 'Painel' })).toBeInTheDocument();
+  const pedido = global.fetch.mock.calls.filter(([url]) => url.includes('/auth/mfa')).pop();
+  expect(JSON.parse(pedido[1].body)).toEqual({ desafio: 'abc', codigo: '123456' });
+});
+
+test('código expirado volta para a tela de senha com o aviso', async () => {
+  loginResponde = () => resposta(200, { mfa: desafioFalso });
+  render(<App />);
+  await preencherLogin();
+  fireEvent.change(await screen.findByLabelText('Código de acesso'), { target: { value: '999999' } });
+
+  expect(await screen.findByRole('heading', { name: 'Entrar' })).toBeInTheDocument();
+  expect(screen.getByRole('alert')).toHaveTextContent('Este código expirou. Entre de novo para receber outro.');
 });
 
 test('aplica máscaras e valida documentos', () => {

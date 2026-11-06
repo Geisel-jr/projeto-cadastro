@@ -79,16 +79,30 @@ jobs:
           esperar() { echo "→ $1"; test "$2" = "$3" || { echo "  esperado $3, recebido $2"; exit 1; }; }
           # extrai o "tokenAcesso" de uma resposta JSON
           token() { grep -o '"tokenAcesso":"[^"]*"' | cut -d'"' -f4; }
+          # extrai o "desafio" da verificação em duas etapas
+          desafio() { grep -o '"desafio":"[^"]*"' | cut -d'"' -f4; }
+          # código de 6 números do e-mail mais recente que chegou ao Mailpit
+          MAILPIT=http://localhost:8025/api/v1
+          codigo_email() { sleep 1; curl -s $MAILPIT/message/latest | grep -o '"Text":"[^"]*"' | grep -o '[0-9]\{6\}' | head -1; }
 
           echo "→ Front responde"
           curl -sf http://localhost:3000 > /dev/null
           echo "→ API e banco estão no ar"
           curl -sf $URL/health
 
-          # Autenticação
+          # Autenticação (administrador confirma o login com o código enviado por e-mail)
           esperar "Sem login retorna 401" "$(status $URL/empresas)" 401
           esperar "Senha errada retorna 401" "$(status -X POST $URL/auth/login -H "$J" -d '{"email":"admin@ci.local","senha":"Errada123"}')" 401
-          PROVISORIO=$(curl -s -X POST $URL/auth/login -H "$J" -d '{"email":"admin@ci.local","senha":"SenhaProvisoria1"}' | token)
+          RESPOSTA=$(curl -s -X POST $URL/auth/login -H "$J" -d '{"email":"admin@ci.local","senha":"SenhaProvisoria1"}')
+          esperar "Senha certa de admin não entrega a sessão sem o código" "$(echo "$RESPOSTA" | token)" ""
+          DESAFIO=$(echo "$RESPOSTA" | desafio)
+          CODIGO_MFA=$(codigo_email)
+          esperar "Código de acesso chega por e-mail" "${#CODIGO_MFA}" 6
+          ERRADO=$([ "$CODIGO_MFA" = 000000 ] && echo 111111 || echo 000000)
+          esperar "Código errado retorna 401" "$(status -X POST $URL/auth/mfa -H "$J" -d "{\"desafio\":\"$DESAFIO\",\"codigo\":\"$ERRADO\"}")" 401
+          PROVISORIO=$(curl -s -X POST $URL/auth/mfa -H "$J" -d "{\"desafio\":\"$DESAFIO\",\"codigo\":\"$CODIGO_MFA\"}" | token)
+          esperar "Código certo entrega a sessão" "$(test -n "$PROVISORIO" && echo ok)" ok
+          esperar "O código não vale duas vezes (410)" "$(status -X POST $URL/auth/mfa -H "$J" -d "{\"desafio\":\"$DESAFIO\",\"codigo\":\"$CODIGO_MFA\"}")" 410
           esperar "Senha provisória bloqueia os cadastros (403)" "$(status $URL/empresas -H "Authorization: Bearer $PROVISORIO")" 403
           TOKEN=$(curl -s -X POST $URL/auth/trocar-senha -H "$J" -H "Authorization: Bearer $PROVISORIO" \
             -d '{"senhaAtual":"SenhaProvisoria1","novaSenha":"SenhaDefinitiva2"}' | token)
@@ -146,7 +160,6 @@ jobs:
           esperar "Arquivos dos documentos espelhados" "$(find backups/arquivos -type f | wc -l | tr -d ' ')" 3
 
           # Recuperação de senha: o e-mail chega ao Mailpit e o link cria uma nova senha
-          MAILPIT=http://localhost:8025/api/v1
           esperar "Pedido de recuperação responde 202" "$(status -X POST $URL/auth/esqueci -H "$J" -d '{"email":"admin@ci.local"}')" 202
           esperar "E-mail desconhecido recebe a mesma resposta" "$(status -X POST $URL/auth/esqueci -H "$J" -d '{"email":"ninguem@ci.local"}')" 202
           sleep 2
@@ -157,7 +170,7 @@ jobs:
           esperar "Nova senha criada pelo link" "$(status -X POST $URL/auth/redefinir -H "$J" -d "{\"token\":\"$CODIGO\",\"novaSenha\":\"RecuperadaNaCI3\"}")" 200
           esperar "O link não funciona duas vezes" "$(status -X POST $URL/auth/redefinir -H "$J" -d "{\"token\":\"$CODIGO\",\"novaSenha\":\"OutraSenha44\"}")" 400
           esperar "Senha antiga não entra mais" "$(status -X POST $URL/auth/login -H "$J" -d '{"email":"admin@ci.local","senha":"SenhaDefinitiva2"}')" 401
-          esperar "Senha nova entra" "$(status -X POST $URL/auth/login -H "$J" -d '{"email":"admin@ci.local","senha":"RecuperadaNaCI3"}')" 200
+          esperar "Senha nova entra (e pede o código)" "$(curl -s -X POST $URL/auth/login -H "$J" -d '{"email":"admin@ci.local","senha":"RecuperadaNaCI3"}' | grep -c '"desafio"')" 1
 
           esperar "Front envia o cabeçalho CSP" "$(curl -sI http://localhost:3000 | grep -ci 'content-security-policy')" 1
 

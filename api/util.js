@@ -55,6 +55,12 @@ function lerId(valor) {
   return id;
 }
 
+// "fulano@empresa.com" -> "fu***@empresa.com" (confirma a conta sem expor o e-mail inteiro)
+const mascararEmail = (email) => {
+  const [nome, dominio] = email.split('@');
+  return `${nome.slice(0, 2)}***@${dominio}`;
+};
+
 // Motivo obrigatório de exclusões e remoções (3 a 500 caracteres)
 function lerMotivo(corpo) {
   const motivo = String(corpo?.motivo ?? '').trim();
@@ -63,4 +69,6 @@ function lerMotivo(corpo) {
   return motivo;
 }
 
-module.exports = { paraSnake, linhaParaObjeto, emTransacao, registrarAuditoria, lerId, lerMotivo, ErroHttp };
+module.exports = {
+  paraSnake, linhaParaObjeto, emTransacao, registrarAuditoria, lerId, lerMotivo, mascararEmail, ErroHttp,
+};

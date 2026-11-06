@@ -1,6 +1,7 @@
 const express = require('express');
 const { gerarHash, validarForcaSenha } = require('./senhas');
 const { revogarSessoesDoUsuario, usuarioPublico } = require('./auth');
+const { encerrarDesafios } = require('./mfa');
 const { emTransacao, registrarAuditoria, lerId, ErroHttp } = require('./util');
 
 const PAPEIS = ['admin', 'operador'];
@@ -13,13 +14,13 @@ const resumo = (u) => ({
   criadoEm: u.criado_em,
 });
 
-function lerDados(corpo, { criando }) {
+function lerDados(corpo) {
   const nome = String(corpo?.nome ?? '').trim();
   const email = String(corpo?.email ?? '').trim().toLowerCase();
   const papel = String(corpo?.papel ?? 'operador');
   const erros = {};
   if (nome.length < 2 || nome.length > 100) erros.nome = 'Informe o nome (2 a 100 caracteres).';
-  if (criando && (!/^\S+@\S+\.\S+$/.test(email) || email.length > 150)) erros.email = 'E-mail inválido.';
+  if (!/^\S+@\S+\.\S+$/.test(email) || email.length > 150) erros.email = 'E-mail inválido.';
   if (!PAPEIS.includes(papel)) erros.papel = 'Perfil inválido.';
   return { nome, email, papel, erros };
 }
@@ -45,7 +46,7 @@ function rotasUsuarios({ pool }) {
   // Cria um usuário. Sem senha, ele só consegue entrar com o Google (pelo e-mail).
   // Com senha, ela é provisória: o sistema exige a troca no primeiro acesso.
   router.post('/', async (req, res) => {
-    const { nome, email, papel, erros } = lerDados(req.body, { criando: true });
+    const { nome, email, papel, erros } = lerDados(req.body);
     const senha = String(req.body?.senha ?? '');
     if (senha) {
       const fraca = validarForcaSenha(senha);
@@ -66,10 +67,10 @@ function rotasUsuarios({ pool }) {
     res.status(201).json(resumo(usuario));
   });
 
-  // Edita nome, perfil e situação (ativo/inativo)
+  // Edita nome, e-mail, perfil e situação (ativo/inativo)
   router.put('/:id', async (req, res) => {
     const id = lerId(req.params.id);
-    const { nome, papel, erros } = lerDados(req.body, { criando: false });
+    const { nome, email, papel, erros } = lerDados(req.body);
     const ativo = req.body?.ativo !== false;
     if (Object.keys(erros).length) throw new ErroHttp(400, 'Verifique os campos destacados.', erros);
 
@@ -80,11 +81,21 @@ function rotasUsuarios({ pool }) {
 
     const usuario = await emTransacao(pool, async (db) => {
       const antes = await buscar(db, id, true);
+      const trocouEmail = email !== antes.email.toLowerCase();
+      // Com e-mail novo, a conta Google vinculada (a do e-mail antigo) deixa de entrar;
+      // o vínculo é refeito no próximo login com Google pelo e-mail novo.
       const { rows } = await db.query(
-        'UPDATE usuarios SET nome = $1, papel = $2, ativo = $3, atualizado_em = NOW() WHERE id = $4 RETURNING *',
-        [nome, papel, ativo, id]
+        `UPDATE usuarios SET nome = $1, email = $2, papel = $3, ativo = $4, atualizado_em = NOW(),
+                google_id = CASE WHEN $5 THEN NULL ELSE google_id END
+          WHERE id = $6 RETURNING *`,
+        [nome, email, papel, ativo, trocouEmail, id]
       );
       if (antes.ativo && !ativo) await revogarSessoesDoUsuario(db, id); // desativado: cai na hora
+      if (trocouEmail) {
+        // Links e códigos já enviados foram para o endereço antigo: deixam de valer
+        await db.query('UPDATE redefinicoes_senha SET usado_em = NOW() WHERE usuario_id = $1 AND usado_em IS NULL', [id]);
+        await encerrarDesafios(db, id);
+      }
       await auditar(db, req, id, 'EDITAR', { antes: resumo(antes), depois: resumo(rows[0]) });
       return rows[0];
     });

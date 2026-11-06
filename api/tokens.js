@@ -39,4 +39,8 @@ function gerarTokenRenovacao() {
 
 const hashToken = (token) => crypto.createHash('sha256').update(token).digest('hex');
 
-module.exports = { gerarTokenAcesso, verificarTokenAcesso, gerarTokenRenovacao, hashToken, DIAS_RENOVACAO };
+// HMAC com o segredo do servidor. Para valores curtos (ex: código de 6 dígitos), um hash
+// simples seria quebrado testando todas as combinações; sem o segredo, isso não é possível.
+const assinar = (valor) => crypto.createHmac('sha256', SEGREDO).update(valor).digest('hex');
+
+module.exports = { gerarTokenAcesso, verificarTokenAcesso, gerarTokenRenovacao, hashToken, assinar, DIAS_RENOVACAO };

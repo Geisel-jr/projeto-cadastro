@@ -57,6 +57,7 @@ services:
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      MFA_ADMIN: ${MFA_ADMIN:-true} # administradores confirmam o login com código por e-mail
       # E-mail (recuperação de senha). Padrão: Mailpit local; em produção, um SMTP real
       APP_URL: ${APP_URL:-http://localhost:3000}
       SMTP_HOST: ${SMTP_HOST:-email}

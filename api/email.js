@@ -40,8 +40,11 @@ const escapar = (texto) => String(texto).replace(/[&<>"']/g, (c) => (
 ));
 
 // Moldura HTML simples (tabelas e estilos inline, que é o que os clientes de e-mail entendem)
-function html({ titulo, paragrafos, botao, rodape }) {
+function html({ titulo, paragrafos, botao, codigo, rodape }) {
   const corpo = paragrafos.map((p) => `<p style="margin:0 0 16px;line-height:1.55">${escapar(p)}</p>`).join('');
+  const destaque = codigo
+    ? `<p style="margin:8px 0 24px;font-family:Consolas,Menlo,monospace;font-size:32px;font-weight:700;letter-spacing:8px">${escapar(codigo)}</p>`
+    : '';
   const acao = botao
     ? `<p style="margin:24px 0"><a href="${escapar(botao.link)}" style="display:inline-block;background:#2952cc;color:#ffffff;text-decoration:none;padding:12px 20px;border-radius:8px;font-weight:600">${escapar(botao.texto)}</a></p>
        <p style="margin:0 0 16px;font-size:13px;color:#52525b">Se o botão não funcionar, copie este endereço no navegador:<br><span style="word-break:break-all;color:#2952cc">${escapar(botao.link)}</span></p>`
@@ -52,7 +55,7 @@ function html({ titulo, paragrafos, botao, rodape }) {
       <tr><td style="padding:28px 28px 8px;font-size:15px"><strong>Cadastro</strong>Hub</td></tr>
       <tr><td style="padding:8px 28px 12px">
         <h1 style="margin:0 0 16px;font-size:20px">${escapar(titulo)}</h1>
-        ${corpo}${acao}
+        ${corpo}${destaque}${acao}
         <p style="margin:24px 0 0;font-size:13px;color:#8a8a93">${escapar(rodape)}</p>
       </td></tr>
     </table>
@@ -97,4 +100,20 @@ function avisarSenhaAlterada(usuario) {
   });
 }
 
-module.exports = { enviarLinkRecuperacao, avisarSenhaAlterada, configuracaoSmtp };
+// Código da verificação em duas etapas. Fica fora do assunto para não aparecer em
+// notificações na tela bloqueada do celular.
+function enviarCodigoAcesso(usuario, codigo, minutos) {
+  const paragrafos = [
+    `Olá, ${usuario.nome}.`,
+    `Use o código abaixo para concluir a entrada no CadastroHub. Ele vale por ${minutos} minutos.`,
+  ];
+  const rodape = 'Se não foi você que tentou entrar, troque sua senha agora: alguém pode conhecê-la.';
+  return enviar({
+    para: usuario.email,
+    assunto: 'Seu código de acesso',
+    texto: `${paragrafos.join('\n\n')}\n\nCódigo: ${codigo}\n\n${rodape}`,
+    conteudoHtml: html({ titulo: 'Código de acesso', paragrafos, codigo, rodape }),
+  });
+}
+
+module.exports = { enviarLinkRecuperacao, avisarSenhaAlterada, enviarCodigoAcesso, configuracaoSmtp };

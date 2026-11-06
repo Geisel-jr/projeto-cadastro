@@ -5,15 +5,9 @@ const { gerarHash, validarForcaSenha } = require('./senhas');
 const { hashToken } = require('./tokens');
 const { revogarSessoesDoUsuario } = require('./auth');
 const { enviarLinkRecuperacao, avisarSenhaAlterada } = require('./email');
-const { emTransacao, registrarAuditoria, ErroHttp } = require('./util');
+const { emTransacao, registrarAuditoria, mascararEmail, ErroHttp } = require('./util');
 
 const MINUTOS_VALIDADE = 30;
-
-// "fulano@empresa.com" -> "fu***@empresa.com" (confirma a conta sem expor o e-mail inteiro)
-const mascararEmail = (email) => {
-  const [nome, dominio] = email.split('@');
-  return `${nome.slice(0, 2)}***@${dominio}`;
-};
 
 const limitar = (limite) => rateLimit({
   windowMs: 15 * 60 * 1000,

@@ -10,3 +10,6 @@ import { TextDecoder, TextEncoder } from 'util';
 
 global.TextEncoder ??= TextEncoder;
 global.TextDecoder ??= TextDecoder;
+
+// O jsdom não rola a página; sem isto, cada troca de rota enche o log de erros "Not implemented"
+window.scrollTo = () => {};

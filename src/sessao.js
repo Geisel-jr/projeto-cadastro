@@ -82,11 +82,22 @@ export async function garantirToken() {
   }
 }
 
+// Devolve { usuario } ou, para administradores, { mfa }: falta o código enviado por e-mail
 export const entrar = async (email, senha) => {
   const dados = await chamarAuth('login', { email, senha });
+  if (dados.mfa) return { mfa: dados.mfa };
+  tokenAcesso = dados.tokenAcesso;
+  return { usuario: dados.usuario };
+};
+
+// Segunda etapa do login: o código de 6 dígitos recebido por e-mail
+export const confirmarCodigo = async (desafio, codigo) => {
+  const dados = await chamarAuth('mfa', { desafio, codigo });
   tokenAcesso = dados.tokenAcesso;
   return dados.usuario;
 };
+
+export const reenviarCodigo = (desafio) => chamarAuth('mfa/reenviar', { desafio });
 
 export const entrarComGoogle = async (credencial) => {
   const dados = await chamarAuth('google', { credencial });

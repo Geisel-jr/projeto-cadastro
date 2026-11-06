@@ -162,7 +162,7 @@ function ModalUsuario({ usuario, proprio, onFechar, onSalvo }) {
     setEnviando(true);
     try {
       if (novo) await apiUsuarios.criar(dados);
-      else await apiUsuarios.atualizar(usuario.id, { nome: dados.nome, papel: dados.papel, ativo: dados.ativo });
+      else await apiUsuarios.atualizar(usuario.id, { nome: dados.nome, email: dados.email, papel: dados.papel, ativo: dados.ativo });
       onSalvo(novo ? 'Usuário cadastrado' : 'Usuário atualizado');
     } catch (err) {
       setErros(err.campos || { geral: mensagemErro(err) });
@@ -189,10 +189,12 @@ function ModalUsuario({ usuario, proprio, onFechar, onSalvo }) {
           <input id="usuario-nome" className={`entrada ${erros.nome ? 'invalida' : ''}`} value={dados.nome}
             onChange={alterar('nome')} maxLength={100} autoFocus />
         </Campo>
-        <Campo id="usuario-email" label="E-mail" obrigatorio={novo} erro={erros.email}
-          ajuda={novo ? 'Também é o e-mail usado no login com Google.' : null}>
+        <Campo id="usuario-email" label="E-mail" obrigatorio erro={erros.email}
+          ajuda={dados.papel === 'admin'
+            ? 'Recebe o código de acesso a cada login com senha e os links de recuperação.'
+            : 'Também é o e-mail usado no login com Google e na recuperação de senha.'}>
           <input id="usuario-email" type="email" className={`entrada ${erros.email ? 'invalida' : ''}`} value={dados.email}
-            onChange={alterar('email')} maxLength={150} disabled={!novo} />
+            onChange={alterar('email')} maxLength={150} />
         </Campo>
         <Campo id="usuario-papel" label="Perfil" erro={erros.papel}
           ajuda={dados.papel === 'admin' ? 'Pode gerenciar usuários.' : 'Pode cadastrar e editar empresas, pessoas e documentos.'}>

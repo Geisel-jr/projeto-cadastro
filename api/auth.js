@@ -4,6 +4,7 @@ const { rateLimit, ipKeyGenerator } = require('express-rate-limit');
 const { OAuth2Client } = require('google-auth-library');
 const { gerarHash, conferirSenha, conferirSenhaFicticia, validarForcaSenha } = require('./senhas');
 const { gerarTokenAcesso, verificarTokenAcesso, gerarTokenRenovacao, hashToken, DIAS_RENOVACAO } = require('./tokens');
+const { exigeMfa, criarDesafio, conferirCodigo, reenviarCodigo, encerrarDesafios } = require('./mfa');
 const { emTransacao, registrarAuditoria, ErroHttp } = require('./util');
 
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || null;
@@ -96,11 +97,14 @@ async function criarSessao(db, req, usuarioId) {
 const gravarCookie = (res, token) =>
   res.cookie(COOKIE, token, { ...OPCOES_COOKIE, maxAge: DIAS_RENOVACAO * 86400000 });
 
-const revogarSessoesDoUsuario = (db, usuarioId, excetoId = null) =>
-  db.query(
+// Derruba as sessões do usuário e os códigos de acesso que ainda estavam valendo
+async function revogarSessoesDoUsuario(db, usuarioId, excetoId = null) {
+  await db.query(
     'UPDATE sessoes SET revogado_em = NOW() WHERE usuario_id = $1 AND revogado_em IS NULL AND id IS DISTINCT FROM $2',
     [usuarioId, excetoId]
   );
+  await encerrarDesafios(db, usuarioId);
+}
 
 // Hard delete: sessões vencidas há mais de 30 dias não têm valor de auditoria
 // (os logins ficam registrados na tabela "auditoria").
@@ -165,7 +169,25 @@ function rotasAuth({ pool }) {
       await recusarLogin(req, usuario, email, !usuario ? 'E-mail não cadastrado' : !correta ? 'Senha incorreta' : 'Conta desativada');
       throw new ErroHttp(401, 'E-mail ou senha incorretos.');
     }
+    // Administrador: a sessão só sai depois do código enviado por e-mail (ver mfa.js)
+    if (exigeMfa(usuario)) return res.json({ mfa: await criarDesafio(pool, req, usuario) });
     await concluirLogin(req, res, usuario, 'senha');
+  });
+
+  // ---------- Verificação em duas etapas: código enviado por e-mail ----------
+  router.post('/mfa', limiteLogin, async (req, res) => {
+    const resultado = await conferirCodigo(pool, String(req.body?.desafio ?? ''), String(req.body?.codigo ?? ''));
+    const usuario = resultado.usuarioId ? await buscarUsuario(pool, 'id', resultado.usuarioId) : null;
+    if (resultado.erro) {
+      if (usuario) await recusarLogin(req, usuario, usuario.email, 'Código de acesso incorreto');
+      throw new ErroHttp(resultado.status, resultado.erro);
+    }
+    if (!usuario?.ativo) throw new ErroHttp(410, 'Não foi possível entrar. Entre de novo.');
+    await concluirLogin(req, res, usuario, 'senha e código por e-mail');
+  });
+
+  router.post('/mfa/reenviar', limiteLogin, async (req, res) => {
+    res.json(await reenviarCodigo(pool, String(req.body?.desafio ?? '')));
   });
 
   // ---------- Login com Google ----------

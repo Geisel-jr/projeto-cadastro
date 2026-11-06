@@ -958,7 +958,20 @@ a.menu-item, a.marca { text-decoration: none; }
 .login-dica { color: var(--texto-3); font-size: 13px; }
 a.btn-grande { text-decoration: none; }
 
+/* Botões com cara de link (voltar, reenviar código) */
+button.link-voltar-acesso, .link-reenviar { padding: 0; border: 0; background: none; }
+.link-reenviar { color: var(--acento); font-weight: 500; }
+.link-reenviar:disabled { opacity: .6; }
+
+/* Código de acesso: números grandes e espaçados, fáceis de conferir com o e-mail */
+.entrada-codigo {
+  height: 48px; padding-left: calc(.7rem + .4em); /* compensa o espaço depois do último número */
+  font-family: var(--fonte-mono); font-size: 22px; font-weight: 500;
+  letter-spacing: .4em; text-align: center; font-variant-numeric: tabular-nums;
+}
+.aviso-info { background: var(--acento-suave); color: var(--acento-hover); border: 1px solid #d5def7; }
+
 @media (hover: hover) {
-  .link-esqueci:hover { text-decoration: underline; }
+  .link-esqueci:hover, .link-reenviar:not(:disabled):hover { text-decoration: underline; }
   .link-voltar-acesso:hover { color: var(--texto); }
 }

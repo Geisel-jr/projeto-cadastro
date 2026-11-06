@@ -6,7 +6,7 @@ import Campo from '../components/Campo';
 import CampoSenha from '../components/CampoSenha';
 import Icone from '../components/Icone';
 import LayoutAcesso from '../components/LayoutAcesso';
-import { entrar, entrarComGoogle } from '../sessao';
+import { confirmarCodigo, entrar, entrarComGoogle, reenviarCodigo } from '../sessao';
 import { useTituloPagina } from '../rotas';
 
 // Tremida curta no formulário quando algo falha (desligada para quem prefere menos movimento)
@@ -26,6 +26,7 @@ export default function Login({ onEntrar }) {
   const [erro, setErro] = useState(null);
   const [enviando, setEnviando] = useState(null); // 'senha' | 'google' | null
   const [googleClientId, setGoogleClientId] = useState(null);
+  const [desafio, setDesafio] = useState(null); // administradores: falta o código enviado por e-mail
   const formulario = useRef(null);
   const campoEmail = useRef(null);
 
@@ -38,11 +39,12 @@ export default function Login({ onEntrar }) {
     setEnviando(null);
     tremer(formulario.current);
     // O e-mail costuma estar certo: devolve o cursor para a senha
-    setTimeout(() => document.getElementById('login-senha')?.focus(), 0);
+    document.getElementById('login-senha')?.focus();
   };
 
   const enviar = async (e) => {
     e.preventDefault();
+    if (enviando) return;
     if (!email.trim() || !senha) {
       setErro('Informe seu e-mail e sua senha.');
       tremer(formulario.current);
@@ -52,7 +54,11 @@ export default function Login({ onEntrar }) {
     setErro(null);
     setEnviando('senha');
     try {
-      onEntrar(await entrar(email.trim(), senha));
+      const { usuario, mfa } = await entrar(email.trim(), senha);
+      if (usuario) return onEntrar(usuario);
+      setSenha('');
+      setEnviando(null);
+      setDesafio(mfa);
     } catch (err) {
       setSenha('');
       falhar(err);
@@ -68,6 +74,21 @@ export default function Login({ onEntrar }) {
       falhar(err);
     }
   };
+
+  if (desafio) {
+    return (
+      <LayoutAcesso>
+        <EtapaCodigo
+          desafio={desafio}
+          onEntrar={onEntrar}
+          onVoltar={(mensagem) => {
+            setDesafio(null);
+            setErro(mensagem || null);
+          }}
+        />
+      </LayoutAcesso>
+    );
+  }
 
   return (
     <LayoutAcesso>
@@ -94,7 +115,7 @@ export default function Login({ onEntrar }) {
             inputMode="email"
             autoFocus
             maxLength={150}
-            disabled={Boolean(enviando)}
+            readOnly={Boolean(enviando)} // readOnly, e não disabled: campo desabilitado perde o foco
           />
         </Campo>
 
@@ -104,7 +125,7 @@ export default function Login({ onEntrar }) {
             valor={senha}
             onChange={setSenha}
             autoComplete="current-password"
-            disabled={Boolean(enviando)}
+            readOnly={Boolean(enviando)}
           />
         </Campo>
         <Link className="link-esqueci" to="/esqueci-senha" state={{ email: email.trim() }}>Esqueci minha senha</Link>
@@ -129,5 +150,132 @@ export default function Login({ onEntrar }) {
         </p>
       </form>
     </LayoutAcesso>
+  );
+}
+
+// Segunda etapa do login dos administradores: o código de 6 números enviado por e-mail
+function EtapaCodigo({ desafio, onEntrar, onVoltar }) {
+  const [codigo, setCodigo] = useState('');
+  const [erro, setErro] = useState(null);
+  const [aviso, setAviso] = useState(null);
+  const [enviando, setEnviando] = useState(false);
+  const [reenviando, setReenviando] = useState(false);
+  const [espera, setEspera] = useState(desafio.reenviarEm); // segundos até liberar o reenvio
+  const [reenvios, setReenvios] = useState(desafio.reenvios);
+  const formulario = useRef(null);
+  const campo = useRef(null);
+
+  useEffect(() => {
+    if (espera <= 0) return undefined;
+    const relogio = setTimeout(() => setEspera((s) => s - 1), 1000);
+    return () => clearTimeout(relogio);
+  }, [espera]);
+
+  const falhar = (err) => {
+    // Código expirado ou erros demais: só entrando com a senha de novo
+    if (err.status === 410) return onVoltar(err.message);
+    setErro(mensagemErro(err));
+    setAviso(null);
+    setCodigo('');
+    setEnviando(false);
+    tremer(formulario.current);
+    campo.current?.focus();
+  };
+
+  const confirmar = async (valor) => {
+    if (enviando) return;
+    if (valor.length !== 6) {
+      setErro('Digite os 6 números do código.');
+      tremer(formulario.current);
+      campo.current?.focus();
+      return;
+    }
+    setErro(null);
+    setEnviando(true);
+    try {
+      onEntrar(await confirmarCodigo(desafio.desafio, valor));
+    } catch (err) {
+      falhar(err);
+    }
+  };
+
+  const digitar = (e) => {
+    const valor = e.target.value.replace(/\D/g, '').slice(0, 6);
+    setCodigo(valor);
+    setErro(null);
+    if (valor.length === 6) confirmar(valor); // colou o código ou digitou o último número
+  };
+
+  const reenviar = async () => {
+    setErro(null);
+    setReenviando(true);
+    try {
+      const novo = await reenviarCodigo(desafio.desafio);
+      setEspera(novo.reenviarEm);
+      setReenvios(novo.reenvios);
+      setCodigo('');
+      setAviso('Enviamos um código novo. O anterior deixou de valer.');
+      campo.current?.focus();
+    } catch (err) {
+      if (err.status === 410) return onVoltar(err.message);
+      setErro(mensagemErro(err));
+    } finally {
+      setReenviando(false);
+    }
+  };
+
+  return (
+    <form
+      className="login-campos login-confirmacao"
+      onSubmit={(e) => { e.preventDefault(); confirmar(codigo); }}
+      noValidate
+      ref={formulario}
+    >
+      <button type="button" className="link-voltar-acesso" onClick={() => onVoltar()}>
+        <Icone nome="voltar" tamanho={15} /> Voltar
+      </button>
+      <h1>Confirme que é você</h1>
+      <p className="login-subtitulo">
+        Enviamos um código de 6 números para <strong>{desafio.email}</strong>. Ele vale por {desafio.minutos} minutos.
+      </p>
+
+      {erro ? (
+        <div className="aviso aviso-erro" role="alert">
+          <Icone nome="alerta" />
+          <span className="aviso-texto">{erro}</span>
+        </div>
+      ) : aviso && (
+        <div className="aviso aviso-info" role="status">
+          <Icone nome="email" />
+          <span className="aviso-texto">{aviso}</span>
+        </div>
+      )}
+
+      <Campo id="login-codigo" label="Código de acesso">
+        <input
+          ref={campo}
+          id="login-codigo"
+          className="entrada entrada-codigo"
+          value={codigo}
+          onChange={digitar}
+          inputMode="numeric"
+          autoComplete="one-time-code"
+          autoFocus
+          spellCheck={false}
+          readOnly={enviando} // readOnly, e não disabled: o cursor continua no campo se o código falhar
+        />
+      </Campo>
+
+      <button type="submit" className="btn btn-primario btn-grande" disabled={enviando}>
+        {enviando ? <><span className="spinner" /> Confirmando...</> : 'Confirmar'}
+      </button>
+
+      <p className="login-dica">
+        Não chegou? Veja a caixa de spam
+        {reenvios <= 0 ? ' ou volte e entre de novo.' : espera > 0 ? ` ou peça outro código em ${espera}s.` : (
+          <> ou <button type="button" className="link-reenviar" onClick={reenviar} disabled={reenviando}>envie outro código</button>.</>
+        )}
+      </p>
+    </form>
   );
 }

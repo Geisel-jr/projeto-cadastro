@@ -9,6 +9,7 @@ banco PostgreSQL e storage de arquivos MinIO, tudo rodando em containers Docker.
 
 - **Login** com e-mail e senha ou com **Google**, sessão com JWT e gestão de usuários (administrador e operador)
 - **Esqueci minha senha**: link de uso único por e-mail, válido por 30 minutos
+- **Verificação em duas etapas** para administradores: código de 6 números enviado por e-mail a cada login com senha
 - Cadastro, edição e exclusão de empresas e pessoas, com formulários organizados em abas
 - **Soft delete**: registros excluídos saem das listagens, mas continuam no banco e podem ser restaurados
 - **Auditoria**: toda inclusão, edição, exclusão e restauração registra quem fez, quando, de qual IP e o que mudou
@@ -65,6 +66,7 @@ Hard delete só é usado para sessões vencidas há mais de 30 dias, que não t�
 | Token roubado reutilizado | Refresh token trocado a cada uso; reuso de um token antigo **derruba todas as sessões** do usuário |
 | Token forjado ou adulterado | JWT assinado (HS256), com emissor, destinatário e validade conferidos; `alg: none` recusado |
 | Força bruta | Limite de 10 tentativas de login falhas a cada 15 minutos por IP |
+| Senha de administrador vazada | **Verificação em duas etapas**: sem o código enviado por e-mail, a senha sozinha não entra |
 | Descobrir quais e-mails existem | Mesma mensagem e mesmo tempo de resposta para e-mail inexistente ou senha errada |
 | Acesso indevido | Todas as rotas exigem login; gestão de usuários só para administradores |
 | Senha padrão esquecida | Senhas criadas pelo administrador são **provisórias**: a API bloqueia tudo até a troca |
@@ -87,9 +89,26 @@ nova senha.
   e-mail avisa que a senha foi alterada.
 - Pedido e uso ficam na auditoria; há limite de pedidos por IP.
 
-No Docker, os e-mails vão para o **Mailpit** (http://localhost:8025), que mostra tudo o que a API
-enviaria, sem entregar a ninguém. Em produção, configure um servidor SMTP real (`SMTP_HOST`,
-`SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_SECURE`, `SMTP_FROM`) e o `APP_URL` com o endereço público.
+No Docker, os e-mails (links de recuperação e códigos de acesso) vão para o **Mailpit**
+(http://localhost:8025), que mostra tudo o que a API enviaria, sem entregar a ninguém. Em produção,
+configure um servidor SMTP real (`SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_SECURE`,
+`SMTP_FROM`) e o `APP_URL` com o endereço público.
+
+**Verificação em duas etapas (administradores):** depois da senha certa, a API envia um código de
+6 números para o e-mail do administrador e só cria a sessão quando ele é digitado.
+
+- O código vale por **10 minutos** e só uma vez. Depois de **5 erros**, é preciso entrar com a senha
+  de novo; e no máximo 5 logins com senha certa a cada 15 minutos por usuário.
+- O navegador recebe um "desafio" aleatório (não o código). O banco guarda o hash do desafio e um
+  **HMAC** do código (com o segredo do servidor): quem lê a tabela não consegue testar os 1 milhão de
+  códigos possíveis.
+- "Reenviar código" libera a cada 30 segundos, até 2 vezes; o código anterior deixa de valer.
+- Trocar a senha, desativar a conta ou mudar o e-mail cancela os códigos pendentes.
+- Códigos errados aparecem na auditoria como login recusado.
+- O login com Google não pede código: ele iria para a mesma conta Google que acabou de ser
+  confirmada (ali, a verificação em duas etapas é a do próprio Google).
+- O administrador precisa de um **e-mail real** (o e-mail de um usuário pode ser corrigido em
+  **Usuários → Editar**). Em emergência, `MFA_ADMIN=false` no `.env` desliga a verificação.
 
 **Login com Google:** só entra quem já foi cadastrado por um administrador (pelo e-mail). O token do
 Google é validado na API com a biblioteca oficial (assinatura, destinatário, validade e e-mail
@@ -110,6 +129,7 @@ verificado). Para ativar:
 | `ADMIN_EMAIL` / `ADMIN_PASSWORD` | Primeiro administrador (só quando não há usuários) |
 | `GOOGLE_CLIENT_ID` | Liga o login com Google |
 | `COOKIE_SECURE` | `true` em produção, com HTTPS |
+| `MFA_ADMIN` | `true` (padrão): administradores confirmam o login com código por e-mail |
 | `APP_URL` | Endereço público do sistema, usado nos links dos e-mails |
 | `SMTP_*` | Servidor de e-mail (vazio = Mailpit local) |
 
@@ -161,6 +181,7 @@ O painel web do MinIO fica em http://localhost:9001 (usuário `minioadmin`, senh
 │   ├── auth.js           # Login (senha e Google), sessões, renovação e proteção das rotas
 │   ├── usuarios.js       # Gestão de usuários (administrador)
 │   ├── recuperacao.js    # "Esqueci minha senha" (link por e-mail)
+│   ├── mfa.js            # Verificação em duas etapas (código por e-mail)
 │   ├── email.js          # Envio de e-mails (SMTP / Mailpit)
 │   ├── senhas.js         # Hash e regras de senha (scrypt)
 │   ├── tokens.js         # JWT de acesso e refresh tokens
@@ -252,7 +273,9 @@ docker compose restart api                      # depois de restaurar
 | --- | --- | --- |
 | GET | `/api/health` | Verifica se a API e o banco estão no ar (público) |
 | GET | `/api/auth/config` | Diz se o login com Google está ligado (público) |
-| POST | `/api/auth/login` | Login com e-mail e senha (público) |
+| POST | `/api/auth/login` | Login com e-mail e senha (público). Administrador recebe `{ mfa: { desafio, ... } }` |
+| POST | `/api/auth/mfa` | Conclui o login com `{ desafio, codigo }` (público) |
+| POST | `/api/auth/mfa/reenviar` | Envia outro código para o mesmo desafio (público) |
 | POST | `/api/auth/google` | Login com o ID token do Google (público) |
 | POST | `/api/auth/renovar` | Troca o refresh token (cookie) por um novo token de acesso |
 | POST | `/api/auth/sair` | Encerra a sessão |
@@ -262,7 +285,7 @@ docker compose restart api                      # depois de restaurar
 | POST | `/api/auth/redefinir/verificar` | Confere se o código do link é válido (público) |
 | POST | `/api/auth/redefinir` | Cria a nova senha com o código do link (público) |
 | GET/POST | `/api/usuarios` | Lista e cria usuários (administrador) |
-| PUT | `/api/usuarios/:id` | Edita nome, perfil e situação (administrador) |
+| PUT | `/api/usuarios/:id` | Edita nome, e-mail, perfil e situação (administrador) |
 | POST | `/api/usuarios/:id/redefinir-senha` | Define uma senha provisória (administrador) |
 | GET | `/api/{cadastro}` | Lista paginada: `?status=excluidos&q=texto&pagina=1&limite=20&ordem=nome&direcao=asc`. Devolve `{ itens, total, pagina, paginas, limite }` |
 | GET | `/api/empresas/opcoes` | Id e nome de todas as empresas ativas (campo de seleção no cadastro de pessoa) |
@@ -287,7 +310,8 @@ docker compose restart api                      # depois de restaurar
 
 Respostas de erro: `400` (dados inválidos, com `erros` por campo), `401` (sem login ou token vencido),
 `403` (sem permissão ou senha provisória), `404` (não encontrado), `409` (duplicado ou registro excluído),
-`429` (muitas tentativas), `500` (erro interno), `503` (storage de arquivos indisponível).
+`410` (código de acesso expirado: entrar de novo), `429` (muitas tentativas), `500` (erro interno),
+`503` (storage de arquivos ou envio de e-mail indisponível).
 
 ## Testes
 

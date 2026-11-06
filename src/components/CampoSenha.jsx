@@ -2,7 +2,7 @@ import { useState } from 'react';
 import Icone from './Icone';
 
 // Campo de senha com botão de mostrar/ocultar e aviso de Caps Lock ligado
-export default function CampoSenha({ id, valor, onChange, invalido, autoComplete, autoFocus, disabled }) {
+export default function CampoSenha({ id, valor, onChange, invalido, autoComplete, autoFocus, disabled, readOnly }) {
   const [visivel, setVisivel] = useState(false);
   const [capsLock, setCapsLock] = useState(false);
   const verificarCaps = (e) => setCapsLock(Boolean(e.getModifierState?.('CapsLock')));
@@ -22,6 +22,7 @@ export default function CampoSenha({ id, valor, onChange, invalido, autoComplete
           autoComplete={autoComplete}
           autoFocus={autoFocus}
           disabled={disabled}
+          readOnly={readOnly}
           maxLength={128}
           aria-invalid={Boolean(invalido)}
         />

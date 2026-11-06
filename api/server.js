@@ -14,6 +14,7 @@ const { linhaParaObjeto, ErroHttp } = require('./util');
 const { rotasAuth, autenticar, exigirPapel, criarAdministradorInicial, limparSessoesAntigas } = require('./auth');
 const { rotasUsuarios } = require('./usuarios');
 const { rotasRecuperacao, limparPedidosAntigos } = require('./recuperacao');
+const { limparDesafiosAntigos } = require('./mfa');
 
 const app = express();
 
@@ -258,6 +259,7 @@ migrar()
     const limpar = () => {
       limparSessoesAntigas(pool);
       limparPedidosAntigos(pool);
+      limparDesafiosAntigos(pool);
     };
     limpar();
     setInterval(limpar, 6 * 60 * 60 * 1000).unref();
