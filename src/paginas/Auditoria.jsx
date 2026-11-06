@@ -82,6 +82,8 @@ export default function Auditoria({ onNavegar }) {
             <option value="LOGOUT">Saída</option>
             <option value="TROCAR_SENHA">Troca de senha</option>
             <option value="REDEFINIR_SENHA">Redefinição de senha</option>
+            <option value="PEDIDO_RECUPERACAO">Pedido de recuperação</option>
+            <option value="RECUPERAR_SENHA">Senha recuperada por e-mail</option>
           </select>
         </div>
 

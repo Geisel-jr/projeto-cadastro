@@ -21,7 +21,7 @@ let loginResponde;
 beforeEach(() => {
   window.history.pushState({}, '', '/');
   loginResponde = () => resposta(200, { tokenAcesso: tokenFalso(), usuario: usuarioTeste });
-  global.fetch = jest.fn((url) => {
+  global.fetch = jest.fn((url, opcoes) => {
     if (url.includes('/auth/renovar')) return resposta(401, { error: 'Sessão encerrada.' });
     if (url.includes('/auth/config')) return resposta(200, { googleClientId: null });
     if (url.includes('/auth/login')) return loginResponde();
@@ -34,6 +34,13 @@ beforeEach(() => {
       });
     }
     if (url.includes('/opcoes')) return resposta(200, []);
+    if (url.includes('/auth/esqueci')) return resposta(202, { mensagem: 'ok' });
+    if (url.includes('/auth/redefinir/verificar')) {
+      return JSON.parse(opcoes?.body || '{}').token === 'valido'
+        ? resposta(200, { email: 'an***@empresa.com' })
+        : resposta(400, { error: 'Este link é inválido ou expirou.' });
+    }
+    if (url.includes('/auth/redefinir')) return resposta(200, { mensagem: 'Senha alterada.' });
     return resposta(200, { itens: [], total: 0, pagina: 1, paginas: 1, limite: 20 });
   });
 });
@@ -94,6 +101,40 @@ test('lista pede a página e a busca da URL ao servidor e mostra a paginação',
   expect(chamada).toContain('pagina=2');
   expect(screen.getByText('21–40')).toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Página 2' })).toHaveAttribute('aria-current', 'page');
+});
+
+test('"Esqueci minha senha" envia o pedido e mostra a confirmação', async () => {
+  render(<App />);
+  fireEvent.change(await screen.findByLabelText('E-mail'), { target: { value: 'ana@empresa.com' } });
+  fireEvent.click(screen.getByRole('link', { name: 'Esqueci minha senha' }));
+
+  // o e-mail digitado no login já vem preenchido
+  expect(await screen.findByRole('heading', { name: 'Esqueci minha senha' })).toBeInTheDocument();
+  expect(screen.getByLabelText('E-mail')).toHaveValue('ana@empresa.com');
+  fireEvent.click(screen.getByRole('button', { name: 'Enviar link' }));
+
+  expect(await screen.findByRole('heading', { name: 'Confira seu e-mail' })).toBeInTheDocument();
+  const pedido = global.fetch.mock.calls.find(([url]) => url.includes('/auth/esqueci'));
+  expect(JSON.parse(pedido[1].body)).toEqual({ email: 'ana@empresa.com' });
+});
+
+test('link do e-mail válido permite criar a nova senha e tira o código da barra de endereço', async () => {
+  window.history.pushState({}, '', '/redefinir-senha?token=valido');
+  render(<App />);
+  expect(await screen.findByText('an***@empresa.com')).toBeInTheDocument();
+  expect(window.location.search).toBe('');
+
+  fireEvent.change(screen.getByLabelText('Nova senha'), { target: { value: 'NovaSenha2026' } });
+  fireEvent.change(screen.getByLabelText('Confirme a nova senha'), { target: { value: 'NovaSenha2026' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Salvar nova senha' }));
+  expect(await screen.findByRole('heading', { name: 'Senha alterada' })).toBeInTheDocument();
+});
+
+test('link do e-mail expirado mostra como pedir um novo', async () => {
+  window.history.pushState({}, '', '/redefinir-senha?token=vencido');
+  render(<App />);
+  expect(await screen.findByRole('heading', { name: 'Link inválido ou expirado' })).toBeInTheDocument();
+  expect(screen.getByRole('link', { name: 'Pedir novo link' })).toHaveAttribute('href', '/esqueci-senha');
 });
 
 test('login recusado mostra a mensagem da API', async () => {

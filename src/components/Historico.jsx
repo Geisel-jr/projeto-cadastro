@@ -16,6 +16,8 @@ const ACOES = {
   LOGIN_FALHOU: { verbo: 'teve o acesso recusado', rotulo: 'Acesso recusado', classe: 'excluir', acesso: true },
   TROCAR_SENHA: { verbo: 'alterou a própria senha', rotulo: 'Senha', classe: 'editar', acesso: true },
   REDEFINIR_SENHA: { verbo: 'redefiniu a senha de', rotulo: 'Senha', classe: 'editar', semArtigo: true },
+  PEDIDO_RECUPERACAO: { verbo: 'pediu um link para recuperar a senha', rotulo: 'Recuperação', classe: 'acesso', acesso: true },
+  RECUPERAR_SENHA: { verbo: 'criou uma nova senha pelo link do e-mail', rotulo: 'Senha', classe: 'editar', acesso: true },
 };
 
 const METODOS = { senha: 'Com e-mail e senha', google: 'Com Google' };

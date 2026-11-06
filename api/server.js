@@ -13,6 +13,7 @@ const { REGRAS_EMPRESA, REGRAS_PESSOA } = require('./validacoes');
 const { linhaParaObjeto, ErroHttp } = require('./util');
 const { rotasAuth, autenticar, exigirPapel, criarAdministradorInicial, limparSessoesAntigas } = require('./auth');
 const { rotasUsuarios } = require('./usuarios');
+const { rotasRecuperacao, limparPedidosAntigos } = require('./recuperacao');
 
 const app = express();
 
@@ -59,6 +60,7 @@ app.get('/api/health', async (req, res) => {
 // ========== AUTENTICAÇÃO (rotas públicas) ==========
 
 app.use('/api/auth', rotasAuth({ pool }));
+app.use('/api/auth', rotasRecuperacao({ pool })); // "esqueci minha senha" (público)
 
 // Daqui para baixo, toda rota exige login
 app.use('/api', autenticar);
@@ -253,8 +255,12 @@ migrar()
   .then(() => criarAdministradorInicial(pool))
   .then(prepararStorage)
   .then(() => {
-    limparSessoesAntigas(pool);
-    setInterval(() => limparSessoesAntigas(pool), 6 * 60 * 60 * 1000).unref();
+    const limpar = () => {
+      limparSessoesAntigas(pool);
+      limparPedidosAntigos(pool);
+    };
+    limpar();
+    setInterval(limpar, 6 * 60 * 60 * 1000).unref();
     app.listen(PORT, () => {
       console.log(`✅ Servidor rodando em http://localhost:${PORT}`);
     });

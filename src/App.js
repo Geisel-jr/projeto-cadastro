@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { BrowserRouter, Link, Route, Routes, useLocation, useNavigate, useParams } from 'react-router';
+import { BrowserRouter, Link, Navigate, Route, Routes, useLocation, useNavigate, useParams } from 'react-router';
 import './App.css';
 import { CADASTROS } from './cadastros';
 import Icone from './components/Icone';
@@ -9,7 +9,9 @@ import Notificacoes from './components/Notificacoes';
 import Auditoria from './paginas/Auditoria';
 import FormularioCadastro from './paginas/FormularioCadastro';
 import ListaCadastro from './paginas/ListaCadastro';
+import EsqueciSenha from './paginas/EsqueciSenha';
 import Login from './paginas/Login';
+import RedefinirSenha from './paginas/RedefinirSenha';
 import NaoEncontrada from './paginas/NaoEncontrada';
 import Painel from './paginas/Painel';
 import Usuarios from './paginas/Usuarios';
@@ -87,6 +89,16 @@ function Aplicacao() {
   // Depois do login, continua no endereço que a pessoa tinha aberto
   const aoEntrar = (usuario) => setSessao({ estado: 'ativa', usuario });
 
+  // O link do e-mail de recuperação funciona com ou sem sessão aberta
+  if (pathname === '/redefinir-senha') {
+    return (
+      <>
+        <RedefinirSenha />
+        <Notificacoes itens={notificacoes} onFechar={fecharNotificacao} />
+      </>
+    );
+  }
+
   const encerrar = async () => {
     try {
       await sair();
@@ -117,7 +129,7 @@ function Aplicacao() {
   if (sessao.estado === 'anonima') {
     return (
       <>
-        <Login onEntrar={aoEntrar} />
+        {pathname === '/esqueci-senha' ? <EsqueciSenha /> : <Login onEntrar={aoEntrar} />}
         <Notificacoes itens={notificacoes} onFechar={fecharNotificacao} />
       </>
     );
@@ -173,6 +185,7 @@ function Aplicacao() {
                 element={<RotaFormulario entidade={entidade} {...props} />} />,
             ])}
             <Route path="/auditoria" element={<Auditoria {...props} />} />
+            <Route path="/esqueci-senha" element={<Navigate to="/" replace />} />
             <Route path="/usuarios" element={admin ? <Usuarios usuarioAtual={usuario} {...props} /> : <NaoEncontrada />} />
             <Route path="*" element={<NaoEncontrada />} />
           </Routes>

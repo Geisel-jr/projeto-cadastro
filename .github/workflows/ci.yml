@@ -145,6 +145,20 @@ jobs:
           esperar "Backup do banco gerado" "$(ls backups/banco/*.dump 2>/dev/null | head -1 | grep -c '.dump')" 1
           esperar "Arquivos dos documentos espelhados" "$(find backups/arquivos -type f | wc -l | tr -d ' ')" 3
 
+          # Recuperação de senha: o e-mail chega ao Mailpit e o link cria uma nova senha
+          MAILPIT=http://localhost:8025/api/v1
+          esperar "Pedido de recuperação responde 202" "$(status -X POST $URL/auth/esqueci -H "$J" -d '{"email":"admin@ci.local"}')" 202
+          esperar "E-mail desconhecido recebe a mesma resposta" "$(status -X POST $URL/auth/esqueci -H "$J" -d '{"email":"ninguem@ci.local"}')" 202
+          sleep 2
+          esperar "Só o e-mail cadastrado recebe mensagem" "$(curl -s $MAILPIT/messages | grep -o '"Address":"[^"]*"' | sort -u | tr '\n' ' ')" '"Address":"admin@ci.local" "Address":"nao-responda@cadastrohub.local" '
+          MENSAGEM=$(curl -s $MAILPIT/messages | grep -o '"ID":"[^"]*"' | head -1 | cut -d'"' -f4)
+          CODIGO=$(curl -s $MAILPIT/message/$MENSAGEM | grep -o 'redefinir-senha?token=[A-Za-z0-9_-]*' | head -1 | cut -d= -f2)
+          esperar "Link do e-mail é válido" "$(status -X POST $URL/auth/redefinir/verificar -H "$J" -d "{\"token\":\"$CODIGO\"}")" 200
+          esperar "Nova senha criada pelo link" "$(status -X POST $URL/auth/redefinir -H "$J" -d "{\"token\":\"$CODIGO\",\"novaSenha\":\"RecuperadaNaCI3\"}")" 200
+          esperar "O link não funciona duas vezes" "$(status -X POST $URL/auth/redefinir -H "$J" -d "{\"token\":\"$CODIGO\",\"novaSenha\":\"OutraSenha44\"}")" 400
+          esperar "Senha antiga não entra mais" "$(status -X POST $URL/auth/login -H "$J" -d '{"email":"admin@ci.local","senha":"SenhaDefinitiva2"}')" 401
+          esperar "Senha nova entra" "$(status -X POST $URL/auth/login -H "$J" -d '{"email":"admin@ci.local","senha":"RecuperadaNaCI3"}')" 200
+
           esperar "Front envia o cabeçalho CSP" "$(curl -sI http://localhost:3000 | grep -ci 'content-security-policy')" 1
 
           echo "✅ Todos os testes passaram"

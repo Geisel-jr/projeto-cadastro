@@ -54,9 +54,30 @@ export const api = {
 
 // ========== CONTA E USUÁRIOS ==========
 
+// Chamada pública (sem login), usada nas telas de acesso
+async function publica(caminho, corpo) {
+  const response = await fetch(`${API_URL}${caminho}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(corpo),
+  });
+  const dados = await response.json().catch(() => null);
+  if (!response.ok) {
+    const erro = new Error(dados?.error || `Erro ${response.status}`);
+    erro.status = response.status;
+    erro.campos = dados?.erros;
+    throw erro;
+  }
+  return dados;
+}
+
 export const conta = {
   // Público: diz se o login com Google está configurado
   configuracao: () => fetch(`${API_URL}/auth/config`).then((r) => r.json()),
+  // Recuperação de senha por e-mail (público)
+  esqueciSenha: (email) => publica('/auth/esqueci', { email }),
+  verificarLink: (token) => publica('/auth/redefinir/verificar', { token }),
+  redefinirSenha: (token, novaSenha) => publica('/auth/redefinir', { token, novaSenha }),
   trocarSenha: async (senhaAtual, novaSenha) => {
     const dados = await requisicao('/auth/trocar-senha', { metodo: 'POST', corpo: { senhaAtual, novaSenha } });
     definirToken(dados.tokenAcesso); // token novo, já sem a marca de senha provisória

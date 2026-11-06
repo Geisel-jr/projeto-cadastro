@@ -934,3 +934,31 @@ a.menu-item, a.marca { text-decoration: none; }
   .ordenar.ativa:hover svg { opacity: 1; }
   .paginacao-numero:not(.atual):hover { background: var(--hover); color: var(--texto); }
 }
+
+/* ==========================================================
+   Telas de acesso: esqueci a senha e criar nova senha
+   ========================================================== */
+.login-campos { display: grid; gap: 1rem; }
+.login-campos h1 { font-size: 26px; font-weight: 600; letter-spacing: -.03em; }
+.login-campos .aviso { margin-bottom: 0; }
+.login-subtitulo strong { color: var(--texto); font-weight: 500; overflow-wrap: anywhere; }
+
+.link-esqueci {
+  justify-self: end; margin-top: -.6rem;
+  color: var(--acento); font-size: 12.5px; font-weight: 500; text-decoration: none;
+}
+.link-esqueci.centro { justify-self: center; margin-top: 0; }
+.link-voltar-acesso {
+  display: inline-flex; align-items: center; gap: .3rem; justify-self: start;
+  color: var(--texto-3); font-size: 13px; text-decoration: none;
+  transition: color var(--rapido) ease;
+}
+.login-confirmacao { animation: surgir var(--medio) var(--ease-out); }
+.login-confirmacao .estado-icone { width: 44px; height: 44px; }
+.login-dica { color: var(--texto-3); font-size: 13px; }
+a.btn-grande { text-decoration: none; }
+
+@media (hover: hover) {
+  .link-esqueci:hover { text-decoration: underline; }
+  .link-voltar-acesso:hover { color: var(--texto); }
+}

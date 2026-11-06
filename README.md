@@ -8,6 +8,7 @@ banco PostgreSQL e storage de arquivos MinIO, tudo rodando em containers Docker.
 ## Funcionalidades
 
 - **Login** com e-mail e senha ou com **Google**, sessão com JWT e gestão de usuários (administrador e operador)
+- **Esqueci minha senha**: link de uso único por e-mail, válido por 30 minutos
 - Cadastro, edição e exclusão de empresas e pessoas, com formulários organizados em abas
 - **Soft delete**: registros excluídos saem das listagens, mas continuam no banco e podem ser restaurados
 - **Auditoria**: toda inclusão, edição, exclusão e restauração registra quem fez, quando, de qual IP e o que mudou
@@ -73,6 +74,23 @@ Hard delete só é usado para sessões vencidas há mais de 30 dias, que não t�
 `ADMIN_PASSWORD` (do arquivo `.env`). Se `ADMIN_PASSWORD` estiver vazio, a senha é gerada e aparece
 no log da API (`docker compose logs api`). No primeiro login o sistema exige a troca da senha.
 
+**Esqueci minha senha:** na tela de login, a pessoa informa o e-mail e recebe um link para criar uma
+nova senha.
+
+- A resposta é sempre a mesma, exista ou não a conta, e o pedido é processado em segundo plano:
+  ninguém descobre quais e-mails estão cadastrados (nem pelo tempo de resposta).
+- O link tem um código aleatório de **uso único**, válido por **30 minutos**; o banco guarda só o hash
+  dele, e um pedido novo invalida os anteriores.
+- O endereço do link vem de `APP_URL`, nunca do cabeçalho da requisição (evita que o link do e-mail
+  aponte para um site falso).
+- Ao abrir o link, o código sai da barra de endereço. Ao salvar, todas as sessões da conta caem e um
+  e-mail avisa que a senha foi alterada.
+- Pedido e uso ficam na auditoria; há limite de pedidos por IP.
+
+No Docker, os e-mails vão para o **Mailpit** (http://localhost:8025), que mostra tudo o que a API
+enviaria, sem entregar a ninguém. Em produção, configure um servidor SMTP real (`SMTP_HOST`,
+`SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_SECURE`, `SMTP_FROM`) e o `APP_URL` com o endereço público.
+
 **Login com Google:** só entra quem já foi cadastrado por um administrador (pelo e-mail). O token do
 Google é validado na API com a biblioteca oficial (assinatura, destinatário, validade e e-mail
 verificado). Para ativar:
@@ -92,6 +110,8 @@ verificado). Para ativar:
 | `ADMIN_EMAIL` / `ADMIN_PASSWORD` | Primeiro administrador (só quando não há usuários) |
 | `GOOGLE_CLIENT_ID` | Liga o login com Google |
 | `COOKIE_SECURE` | `true` em produção, com HTTPS |
+| `APP_URL` | Endereço público do sistema, usado nos links dos e-mails |
+| `SMTP_*` | Servidor de e-mail (vazio = Mailpit local) |
 
 ## Documentos (MinIO)
 
@@ -140,6 +160,8 @@ O painel web do MinIO fica em http://localhost:9001 (usuário `minioadmin`, senh
 │   ├── server.js         # Configuração, segurança, auditoria e tratamento de erros
 │   ├── auth.js           # Login (senha e Google), sessões, renovação e proteção das rotas
 │   ├── usuarios.js       # Gestão de usuários (administrador)
+│   ├── recuperacao.js    # "Esqueci minha senha" (link por e-mail)
+│   ├── email.js          # Envio de e-mails (SMTP / Mailpit)
 │   ├── senhas.js         # Hash e regras de senha (scrypt)
 │   ├── tokens.js         # JWT de acesso e refresh tokens
 │   ├── test/             # Testes de segurança (node --test)
@@ -171,6 +193,7 @@ Depois acesse:
 - **API:** http://localhost:5000/api/health
 - **Banco:** `localhost:5433` (usuário `postgres`, senha `postgres`)
 - **MinIO (painel web):** http://localhost:9001 (usuário `minioadmin`, senha `minioadmin123`)
+- **E-mails enviados (Mailpit):** http://localhost:8025
 
 Ao iniciar, a API executa as migrations pendentes da pasta `api/migrations`: as tabelas são criadas
 ou atualizadas automaticamente, sem perder dados. Para parar:
@@ -235,6 +258,9 @@ docker compose restart api                      # depois de restaurar
 | POST | `/api/auth/sair` | Encerra a sessão |
 | GET | `/api/auth/eu` | Dados do usuário logado |
 | POST | `/api/auth/trocar-senha` | Troca a senha do usuário logado |
+| POST | `/api/auth/esqueci` | Pede o link de redefinição por e-mail (público; resposta sempre igual) |
+| POST | `/api/auth/redefinir/verificar` | Confere se o código do link é válido (público) |
+| POST | `/api/auth/redefinir` | Cria a nova senha com o código do link (público) |
 | GET/POST | `/api/usuarios` | Lista e cria usuários (administrador) |
 | PUT | `/api/usuarios/:id` | Edita nome, perfil e situação (administrador) |
 | POST | `/api/usuarios/:id/redefinir-senha` | Define uma senha provisória (administrador) |

@@ -4,12 +4,7 @@ import Campo from './Campo';
 import CampoSenha from './CampoSenha';
 import Icone from './Icone';
 import Modal from './Modal';
-
-// Requisitos mostrados enquanto a pessoa digita (os mesmos que a API exige)
-const REQUISITOS = [
-  { texto: 'Pelo menos 8 caracteres', ok: (s) => s.length >= 8 },
-  { texto: 'Letras e números', ok: (s) => /\p{L}/u.test(s) && /\d/.test(s) },
-];
+import RequisitosSenha, { senhaAtendeRequisitos } from './RequisitosSenha';
 
 // Troca de senha. "obrigatoria" = senha provisória: não dá para fechar, só trocar ou sair.
 export default function ModalSenha({ usuario, obrigatoria = false, onConcluir, onFechar, onSair }) {
@@ -24,7 +19,7 @@ export default function ModalSenha({ usuario, obrigatoria = false, onConcluir, o
     e.preventDefault();
     const novos = {};
     if (pedeAtual && !senhaAtual) novos.senhaAtual = 'Informe a senha atual.';
-    if (!REQUISITOS.every((r) => r.ok(novaSenha))) novos.novaSenha = 'A senha não atende aos requisitos.';
+    if (!senhaAtendeRequisitos(novaSenha)) novos.novaSenha = 'A senha não atende aos requisitos.';
     else if (novaSenha !== confirmacao) novos.confirmacao = 'As senhas não conferem.';
     setErros(novos);
     if (Object.keys(novos).length) return;
@@ -74,13 +69,7 @@ export default function ModalSenha({ usuario, obrigatoria = false, onConcluir, o
           <CampoSenha id="nova-senha" valor={novaSenha} onChange={setNovaSenha} invalido={erros.novaSenha}
             autoComplete="new-password" autoFocus={!pedeAtual} />
         </Campo>
-        <ul className="requisitos" aria-label="Requisitos da senha">
-          {REQUISITOS.map((r) => (
-            <li key={r.texto} className={r.ok(novaSenha) ? 'ok' : ''}>
-              <Icone nome="check" tamanho={13} /> {r.texto}
-            </li>
-          ))}
-        </ul>
+        <RequisitosSenha senha={novaSenha} />
         <Campo id="confirmar-senha" label="Confirme a nova senha" erro={erros.confirmacao}>
           <CampoSenha id="confirmar-senha" valor={confirmacao} onChange={setConfirmacao} invalido={erros.confirmacao}
             autoComplete="new-password" />
