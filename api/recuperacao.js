@@ -92,7 +92,7 @@ function rotasRecuperacao({ pool }) {
       if (!pedido) throw new ErroHttp(400, 'Este link é inválido ou expirou.');
 
       const { rows } = await db.query(
-        `UPDATE usuarios SET senha_hash = $1, deve_trocar_senha = FALSE, atualizado_em = NOW()
+        `UPDATE usuarios SET senha_hash = $1, deve_trocar_senha = FALSE, demo = FALSE, atualizado_em = NOW()
          WHERE id = $2 RETURNING *`,
         [hash, pedido.usuario_id]
       );

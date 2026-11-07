@@ -15,6 +15,7 @@ const { rotasAuth, autenticar, exigirPapel, criarAdministradorInicial, limparSes
 const { rotasUsuarios } = require('./usuarios');
 const { rotasRecuperacao, limparPedidosAntigos } = require('./recuperacao');
 const { limparDesafiosAntigos } = require('./mfa');
+const { popularDadosExemplo } = require('./seeds');
 
 const app = express();
 
@@ -253,8 +254,14 @@ app.use((erro, req, res, next) => {
 const PORT = process.env.PORT || 5000;
 
 migrar()
-  .then(() => criarAdministradorInicial(pool))
-  .then(prepararStorage)
+  .then(async () => {
+    const primeiraSubida = await criarAdministradorInicial(pool); // true só com o banco ainda sem usuários
+    await prepararStorage();
+    // Dados de exemplo só na primeira subida: um banco que já tem dados nunca recebe o seed
+    if (primeiraSubida && process.env.DADOS_EXEMPLO !== 'false') {
+      await popularDadosExemplo(pool).catch((erro) => console.error('❌ Dados de exemplo não gravados:', erro.message));
+    }
+  })
   .then(() => {
     const limpar = () => {
       limparSessoesAntigas(pool);

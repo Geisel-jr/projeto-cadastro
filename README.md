@@ -2,320 +2,118 @@
 
 [![CI](https://github.com/Geisel-jr/projeto-cadastro/actions/workflows/ci.yml/badge.svg)](https://github.com/Geisel-jr/projeto-cadastro/actions/workflows/ci.yml)
 
-Sistema de cadastro de **empresas** e **pessoas**, com front-end em React, API em Node.js/Express,
-banco PostgreSQL e storage de arquivos MinIO, tudo rodando em containers Docker.
+Sistema para cadastrar empresas e pessoas e guardar os documentos das empresas. Ele avisa quando um
+documento está perto de vencer e guarda o histórico de cada cadastro (quem criou, quem alterou, quando
+e o que mudou).
 
-## Funcionalidades
+O front-end é em React, a API em Node.js, o banco em PostgreSQL e os arquivos ficam no MinIO. Tudo roda
+em containers Docker.
 
-- **Login** com e-mail e senha ou com **Google**, sessão com JWT e gestão de usuários (administrador e operador)
-- **Esqueci minha senha**: link de uso único por e-mail, válido por 30 minutos
-- **Verificação em duas etapas** para administradores: código de 6 números enviado por e-mail a cada login com senha
-- Cadastro, edição e exclusão de empresas e pessoas, com formulários organizados em abas
-- **Soft delete**: registros excluídos saem das listagens, mas continuam no banco e podem ser restaurados
-- **Auditoria**: toda inclusão, edição, exclusão e restauração registra quem fez, quando, de qual IP e o que mudou
-- Preenchimento automático pelo CNPJ (dados da Receita Federal via [BrasilAPI](https://brasilapi.com.br)) e pelo CEP ([ViaCEP](https://viacep.com.br))
-- Máscaras e validação de CPF, CNPJ, telefone e CEP (no front e na API)
-- **Documentos da empresa** (cartão CNPJ, contrato social, certidões...) guardados no MinIO, com validade,
-  visualização, download, remoção com motivo e restauração
-- Vínculo entre pessoa e empresa
-- Busca nas listagens e filtro de ativos/excluídos
-- Migrations automáticas do banco
-- **Alertas de vencimento** no painel: documentos vencidos ou que vencem nos próximos 30 dias
-  (considera só a versão mais recente de cada documento), e aviso de vencidos na lista de empresas
-- **Endereços de página** (`/empresas/12`, `/pessoas?status=excluidos&q=maria`): o "voltar" do navegador
-  funciona, recarregar mantém a página e os links podem ser compartilhados
-- **Listas paginadas no servidor**, com ordenação pelo cabeçalho das colunas e busca no banco que ignora
-  acentos ("pao" encontra "Pão") e aceita documentos formatados ou não
-- **Backup automático** diário do banco e dos arquivos, com restauração por comando
-- Layout responsivo (desktop e celular)
+## Objetivo
 
-## Auditoria e exclusão
-
-Nenhum cadastro é apagado de verdade. Ao excluir, o sistema pede um **motivo** e apenas marca o registro
-como excluído (`excluido_em`, `excluido_por`, `motivo_exclusao`). Ele pode ser consultado e restaurado
-pelo filtro **Excluídos** da listagem.
-
-Cada ação grava uma linha na tabela `auditoria`, na mesma transação da alteração, com o registro antes
-e depois da mudança. Essa tabela é protegida por um trigger no banco: **não aceita UPDATE nem DELETE**.
-
-O autor de cada ação vem do usuário logado (nome e id, tirados do token). Logins, saídas, tentativas
-recusadas e trocas de senha também ficam na auditoria.
-
-Hard delete só é usado para sessões vencidas há mais de 30 dias, que não têm valor de auditoria
-(os logins já estão registrados na tabela `auditoria`).
-
-## Autenticação e segurança
-
-**Como a sessão funciona**
-
-1. No login (senha ou Google), a API devolve um **token de acesso (JWT)** válido por 15 minutos e grava um
-   **refresh token** num cookie.
-2. O front guarda o token de acesso **só na memória** (nunca no `localStorage`) e o envia em toda
-   requisição: `Authorization: Bearer <token>`.
-3. Quando o token está para vencer, o front chama `/api/auth/renovar`. A API confere o cookie, troca o
-   refresh token por um novo (**rotação**) e entrega outro token de acesso. Ao recarregar a página, o
-   mesmo processo recupera a sessão sem pedir login.
-
-**Proteções**
-
-| Risco | Proteção |
-| --- | --- |
-| Senhas vazadas do banco | Hash com **scrypt** (parâmetros da OWASP: N=2^17, r=8, p=1) e sal aleatório |
-| Roubo de token por XSS | Token de acesso só na memória; refresh token em cookie **httpOnly**; CSP no nginx |
-| CSRF | Cookie **SameSite=Strict**, restrito a `/api/auth`, e cabeçalho `X-Requested-With` obrigatório |
-| Token roubado reutilizado | Refresh token trocado a cada uso; reuso de um token antigo **derruba todas as sessões** do usuário |
-| Token forjado ou adulterado | JWT assinado (HS256), com emissor, destinatário e validade conferidos; `alg: none` recusado |
-| Força bruta | Limite de 10 tentativas de login falhas a cada 15 minutos por IP |
-| Senha de administrador vazada | **Verificação em duas etapas**: sem o código enviado por e-mail, a senha sozinha não entra |
-| Descobrir quais e-mails existem | Mesma mensagem e mesmo tempo de resposta para e-mail inexistente ou senha errada |
-| Acesso indevido | Todas as rotas exigem login; gestão de usuários só para administradores |
-| Senha padrão esquecida | Senhas criadas pelo administrador são **provisórias**: a API bloqueia tudo até a troca |
-| Cabeçalhos inseguros | `helmet` na API; CSP, `X-Frame-Options`, `Referrer-Policy` e outros no nginx |
-
-**Primeiro acesso:** se não houver usuários, a API cria um administrador com `ADMIN_EMAIL` e
-`ADMIN_PASSWORD` (do arquivo `.env`). Se `ADMIN_PASSWORD` estiver vazio, a senha é gerada e aparece
-no log da API (`docker compose logs api`). No primeiro login o sistema exige a troca da senha.
-
-**Esqueci minha senha:** na tela de login, a pessoa informa o e-mail e recebe um link para criar uma
-nova senha.
-
-- A resposta é sempre a mesma, exista ou não a conta, e o pedido é processado em segundo plano:
-  ninguém descobre quais e-mails estão cadastrados (nem pelo tempo de resposta).
-- O link tem um código aleatório de **uso único**, válido por **30 minutos**; o banco guarda só o hash
-  dele, e um pedido novo invalida os anteriores.
-- O endereço do link vem de `APP_URL`, nunca do cabeçalho da requisição (evita que o link do e-mail
-  aponte para um site falso).
-- Ao abrir o link, o código sai da barra de endereço. Ao salvar, todas as sessões da conta caem e um
-  e-mail avisa que a senha foi alterada.
-- Pedido e uso ficam na auditoria; há limite de pedidos por IP.
-
-No Docker, os e-mails (links de recuperação e códigos de acesso) vão para o **Mailpit**
-(http://localhost:8025), que mostra tudo o que a API enviaria, sem entregar a ninguém. Em produção,
-configure um servidor SMTP real (`SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_SECURE`,
-`SMTP_FROM`) e o `APP_URL` com o endereço público.
-
-**Verificação em duas etapas (administradores):** depois da senha certa, a API envia um código de
-6 números para o e-mail do administrador e só cria a sessão quando ele é digitado.
-
-- O código vale por **10 minutos** e só uma vez. Depois de **5 erros**, é preciso entrar com a senha
-  de novo; e no máximo 5 logins com senha certa a cada 15 minutos por usuário.
-- O navegador recebe um "desafio" aleatório (não o código). O banco guarda o hash do desafio e um
-  **HMAC** do código (com o segredo do servidor): quem lê a tabela não consegue testar os 1 milhão de
-  códigos possíveis.
-- "Reenviar código" libera a cada 30 segundos, até 2 vezes; o código anterior deixa de valer.
-- Trocar a senha, desativar a conta ou mudar o e-mail cancela os códigos pendentes.
-- Códigos errados aparecem na auditoria como login recusado.
-- O login com Google não pede código: ele iria para a mesma conta Google que acabou de ser
-  confirmada (ali, a verificação em duas etapas é a do próprio Google).
-- O administrador precisa de um **e-mail real** (o e-mail de um usuário pode ser corrigido em
-  **Usuários → Editar**). Em emergência, `MFA_ADMIN=false` no `.env` desliga a verificação.
-
-**Login com Google:** só entra quem já foi cadastrado por um administrador (pelo e-mail). O token do
-Google é validado na API com a biblioteca oficial (assinatura, destinatário, validade e e-mail
-verificado). Para ativar:
-
-1. No [Google Cloud Console](https://console.cloud.google.com/apis/credentials), crie um projeto e
-   configure a **tela de consentimento OAuth** (tipo "Externo", modo de teste já serve).
-2. Em **Credenciais → Criar credenciais → ID do cliente OAuth**, escolha **Aplicativo da Web**.
-3. Em **Origens JavaScript autorizadas**, adicione `http://localhost:3000` e `http://localhost`.
-4. Copie o **Client ID** para `GOOGLE_CLIENT_ID` no `.env` e rode `docker compose up -d`.
-   O botão "Fazer login com o Google" aparece sozinho na tela de login.
-
-**Variáveis de ambiente** (veja `.env.example`):
-
-| Variável | Para que serve |
-| --- | --- |
-| `JWT_SECRET` | Segredo que assina os tokens. Use um valor aleatório e longo |
-| `ADMIN_EMAIL` / `ADMIN_PASSWORD` | Primeiro administrador (só quando não há usuários) |
-| `GOOGLE_CLIENT_ID` | Liga o login com Google |
-| `COOKIE_SECURE` | `true` em produção, com HTTPS |
-| `MFA_ADMIN` | `true` (padrão): administradores confirmam o login com código por e-mail |
-| `APP_URL` | Endereço público do sistema, usado nos links dos e-mails |
-| `SMTP_*` | Servidor de e-mail (vazio = Mailpit local) |
-
-## Documentos (MinIO)
-
-Os arquivos ficam no **MinIO**, um storage compatível com Amazon S3, no bucket `documentos`
-(criado automaticamente pela API). No banco fica só o registro do documento: tipo, validade, nome
-original, tamanho e o caminho do objeto no storage.
-
-- Tipos disponíveis: **Cartão CNPJ** (padrão), Contrato Social, Inscrição Estadual, Alvará de
-  Funcionamento, Certidão Negativa Federal (CND), Certificado de Regularidade do FGTS (CRF),
-  Certidão Negativa de Débitos Trabalhistas (CNDT), Comprovante de Endereço, Comprovante Bancário,
-  Procuração e **Outros** (com descrição obrigatória).
-- Formatos aceitos: PDF, PNG, JPG, WEBP, DOCX e XLSX, até 10 MB.
-- O nome do objeto no storage é gerado pela API (nunca o nome enviado pelo usuário).
-- Remover um documento também é soft delete: o arquivo continua no storage e pode ser restaurado.
-- Anexar, remover e restaurar aparecem no histórico da empresa.
-- A lista de empresas avisa quando falta o cartão CNPJ.
-
-O painel web do MinIO fica em http://localhost:9001 (usuário `minioadmin`, senha `minioadmin123`).
-
-> A imagem oficial `minio/minio` deixou de ser publicada no Docker Hub. O projeto usa
-> `pgsty/minio`, um fork comunitário mantido que funciona da mesma forma.
+Ter um cadastro de empresas e pessoas em que nada se perde. Um registro excluído continua no banco e
+pode ser restaurado, só entra quem tem login e toda alteração fica registrada na auditoria.
 
 ## Tecnologias
 
-| Camada | Tecnologia |
+| Parte | Tecnologia |
 | --- | --- |
-| Front-end | React 19, React Router 7, CSS próprio (sem framework de UI) |
-| API | Node.js, Express 5, `pg` |
-| Autenticação | JWT (`jsonwebtoken`), scrypt (nativo do Node), Google Identity Services (`google-auth-library`), `helmet`, `express-rate-limit` |
-| Banco | PostgreSQL 16 |
-| Arquivos | MinIO (compatível com S3), `minio` e `multer` na API |
-| Infra | Docker, Docker Compose, Nginx |
+| Front-end | React 19, React Router 7, CSS próprio |
+| API | Node.js 20, Express 5 |
+| Banco | PostgreSQL 16, com migrations automáticas |
+| Arquivos | MinIO (compatível com Amazon S3) |
+| Login e segurança | JWT, scrypt, login com Google, helmet, limite de tentativas |
+| E-mail | nodemailer com Gmail; Mailpit para testes |
+| Infra | Docker Compose, Nginx, GitHub Actions |
 
-## Estrutura
+## Principais rotinas e integrações
 
-```
-├── src/                  # Front-end React
-│   ├── cadastros/        # Configuração dos formulários (campos, abas, colunas da lista)
-│   ├── paginas/          # Login, painel, listagem, formulário, auditoria e usuários
-│   ├── components/       # Componentes reutilizáveis (modal, histórico, campos, ícones)
-│   ├── utils/            # Máscaras, validações, formatação e consultas de CEP/CNPJ
-│   ├── sessao.js         # Token de acesso em memória e renovação automática
-│   ├── rotas.js          # Endereços das páginas e título da aba
-│   └── api.js            # Chamadas à API
-├── api/                  # API Node.js/Express
-│   ├── server.js         # Configuração, segurança, auditoria e tratamento de erros
-│   ├── auth.js           # Login (senha e Google), sessões, renovação e proteção das rotas
-│   ├── usuarios.js       # Gestão de usuários (administrador)
-│   ├── recuperacao.js    # "Esqueci minha senha" (link por e-mail)
-│   ├── mfa.js            # Verificação em duas etapas (código por e-mail)
-│   ├── email.js          # Envio de e-mails (SMTP / Mailpit)
-│   ├── senhas.js         # Hash e regras de senha (scrypt)
-│   ├── tokens.js         # JWT de acesso e refresh tokens
-│   ├── test/             # Testes de segurança (node --test)
-│   ├── cadastros.js      # Rotas de cadastro (CRUD com soft delete e auditoria)
-│   ├── documentos.js     # Rotas de documentos (envio, download, remoção e restauração)
-│   ├── storage.js        # Conexão com o MinIO
-│   ├── validacoes.js     # Validação dos dados recebidos
-│   ├── db.js             # Conexão e execução das migrations
-│   ├── util.js           # Funções comuns (transação, auditoria, erros HTTP)
-│   └── migrations/       # Scripts SQL de criação e evolução do banco
-├── backup/               # Imagem e scripts de backup e restauração (pg_dump + mc)
-├── nginx.conf            # Servidor do front (repassa /api para a API)
-├── dockerfile            # Imagem do front
-└── docker-compose.yml    # Sobe banco, storage, API, front e backup juntos
-```
+### Rotinas
 
-## Como rodar com Docker (recomendado)
+- Cadastro de empresas e pessoas, com formulário em abas e validação de CPF, CNPJ, telefone e CEP.
+  A pessoa pode ser ligada a uma empresa.
+- Exclusão sem apagar do banco (soft delete). O registro sai da lista, mas continua guardado e pode
+  ser restaurado.
+- Auditoria de tudo o que é feito: quem fez, quando, de qual IP e como o registro estava antes e
+  depois. Esses registros não podem ser alterados nem apagados.
+- Documentos da empresa (cartão CNPJ, contrato social, certidões etc.) com data de validade. O painel
+  mostra o que já venceu e o que vence nos próximos 30 dias.
+- Listas paginadas, com ordenação pelas colunas e busca que não diferencia acentos.
+- Login com senha ou com Google, com perfil de administrador ou operador. Tem "esqueci minha senha"
+  por e-mail, e o administrador recebe um código por e-mail para entrar.
+- Backup automático do banco e dos arquivos uma vez por dia.
 
-Pré-requisito: [Docker Desktop](https://www.docker.com/products/docker-desktop/) aberto.
+### Integrações
+
+| Serviço | Para que é usado |
+| --- | --- |
+| [BrasilAPI](https://brasilapi.com.br) | Busca os dados da empresa pelo CNPJ |
+| [ViaCEP](https://viacep.com.br) | Busca o endereço pelo CEP |
+| Google | Login com a conta Google (opcional) |
+| Gmail | Envio dos e-mails de recuperação de senha e dos códigos de acesso |
+| MinIO | Armazenamento dos arquivos dos documentos |
+
+## Instalação
+
+É preciso ter o [Git](https://git-scm.com/downloads) e o
+[Docker Desktop](https://www.docker.com/products/docker-desktop/) instalados, com o Docker aberto.
 
 ```bash
-cp .env.example .env   # defina JWT_SECRET e os dados do primeiro administrador
+git clone https://github.com/Geisel-jr/projeto-cadastro.git
+cd projeto-cadastro
 docker compose up -d --build
 ```
 
-Depois acesse:
+Na primeira vez demora alguns minutos. Não precisa criar o arquivo `.env`: sem ele, o sistema usa as
+configurações de desenvolvimento, cria um usuário de demonstração e já cadastra alguns dados de exemplo.
 
-- **Front-end:** http://localhost:3000
-- **API:** http://localhost:5000/api/health
-- **Banco:** `localhost:5433` (usuário `postgres`, senha `postgres`)
-- **MinIO (painel web):** http://localhost:9001 (usuário `minioadmin`, senha `minioadmin123`)
-- **E-mails enviados (Mailpit):** http://localhost:8025
+Depois é só abrir http://localhost:3000. O e-mail e a senha do usuário de demonstração aparecem na
+tela de login, basta copiar e colar.
 
-Ao iniciar, a API executa as migrations pendentes da pasta `api/migrations`: as tabelas são criadas
-ou atualizadas automaticamente, sem perder dados. Para parar:
+Outros endereços:
 
-```bash
-docker compose down
-```
+| Endereço | O que tem |
+| --- | --- |
+| http://localhost:8025 | E-mails enviados pelo sistema (Mailpit) |
+| http://localhost:9001 | Arquivos no MinIO (usuário `minioadmin`, senha `minioadmin123`) |
+| http://localhost:5000/api/health | Se a API e o banco estão funcionando |
 
-Para parar **e apagar os dados** (banco e arquivos): `docker compose down -v`.
-
-## Backup
-
-O container `backup` faz uma cópia ao subir e depois a cada 24 horas, na pasta `backups/` do projeto
-(fora do git):
-
-- `backups/banco/AAAA-MM-DD_HH-MM-SS.dump`: cópia completa do banco (`pg_dump`), inclusive a auditoria.
-  São guardadas as dos últimos 7 dias.
-- `backups/arquivos/`: espelho dos documentos do MinIO. Como os documentos nunca são apagados de
-  verdade (soft delete), o espelho só cresce e não é duplicado a cada cópia.
-
-Intervalo, retenção e fuso horário são configuráveis no `.env` (`BACKUP_INTERVALO_HORAS`,
-`BACKUP_RETENCAO_DIAS`, `FUSO_HORARIO`).
+Para parar:
 
 ```bash
-docker compose exec backup backup.sh agora      # faz um backup na hora
-docker compose exec backup restaurar.sh         # lista os backups disponíveis
-docker compose exec -e CONFIRMAR=sim backup restaurar.sh ultimo   # restaura o mais recente
-docker compose restart api                      # depois de restaurar
+docker compose down      # para o sistema e mantém os dados
+docker compose down -v   # para e apaga banco e arquivos (na próxima vez tudo é criado de novo)
 ```
 
-> A restauração **substitui todos os dados atuais** pelos do backup, inclusive a auditoria feita depois
-> dele. Por isso ela só roda com `CONFIRMAR=sim`. Para proteger contra a perda do computador, copie a
-> pasta `backups/` para outro lugar (um disco externo ou a nuvem).
+Para configurar o Gmail, o login com Google ou outro administrador, copie o `.env.example` para `.env`
+e preencha. Os detalhes estão em [docs/seguranca.md](docs/seguranca.md).
 
-## Como rodar sem Docker (desenvolvimento)
+## Dados de exemplo (seed)
 
-1. Crie o banco `cadastros_db` no seu PostgreSQL (as tabelas são criadas pela API ao iniciar).
-   Para os anexos, suba só o MinIO com `docker compose up -d minio`.
-2. API:
-   ```bash
-   cd api
-   cp .env.example .env   # edite com a senha do seu PostgreSQL
-   npm install
-   npm run dev
-   ```
-3. Front-end (em outro terminal, na raiz do projeto):
-   ```bash
-   npm install
-   npm start
-   ```
-   O front abre em http://localhost:3000 e usa a API em `http://localhost:5000/api`.
+Na primeira vez que o sistema sobe, com o banco vazio, a API cadastra 12 empresas, 24 pessoas e 17
+documentos. Os dados são fictícios e foram gerados com IA, mas os CPFs e CNPJs têm dígitos
+verificadores válidos. Alguns documentos já estão vencidos ou perto de vencer, para o aviso aparecer no
+painel, e há uma empresa e uma pessoa excluídas para testar o filtro de excluídos.
 
-## Endpoints da API
+Os dados estão em [`api/seeds/dados-exemplo.json`](api/seeds/dados-exemplo.json) e quem grava é o
+[`api/seeds.js`](api/seeds.js). Eles passam pela mesma validação da API e aparecem na auditoria com o
+autor "Dados de exemplo". Se o banco já tiver dados, o seed não roda. Para desligar, coloque
+`DADOS_EXEMPLO=false` no `.env`.
 
-| Método | Rota | Descrição |
-| --- | --- | --- |
-| GET | `/api/health` | Verifica se a API e o banco estão no ar (público) |
-| GET | `/api/auth/config` | Diz se o login com Google está ligado (público) |
-| POST | `/api/auth/login` | Login com e-mail e senha (público). Administrador recebe `{ mfa: { desafio, ... } }` |
-| POST | `/api/auth/mfa` | Conclui o login com `{ desafio, codigo }` (público) |
-| POST | `/api/auth/mfa/reenviar` | Envia outro código para o mesmo desafio (público) |
-| POST | `/api/auth/google` | Login com o ID token do Google (público) |
-| POST | `/api/auth/renovar` | Troca o refresh token (cookie) por um novo token de acesso |
-| POST | `/api/auth/sair` | Encerra a sessão |
-| GET | `/api/auth/eu` | Dados do usuário logado |
-| POST | `/api/auth/trocar-senha` | Troca a senha do usuário logado |
-| POST | `/api/auth/esqueci` | Pede o link de redefinição por e-mail (público; resposta sempre igual) |
-| POST | `/api/auth/redefinir/verificar` | Confere se o código do link é válido (público) |
-| POST | `/api/auth/redefinir` | Cria a nova senha com o código do link (público) |
-| GET/POST | `/api/usuarios` | Lista e cria usuários (administrador) |
-| PUT | `/api/usuarios/:id` | Edita nome, e-mail, perfil e situação (administrador) |
-| POST | `/api/usuarios/:id/redefinir-senha` | Define uma senha provisória (administrador) |
-| GET | `/api/{cadastro}` | Lista paginada: `?status=excluidos&q=texto&pagina=1&limite=20&ordem=nome&direcao=asc`. Devolve `{ itens, total, pagina, paginas, limite }` |
-| GET | `/api/empresas/opcoes` | Id e nome de todas as empresas ativas (campo de seleção no cadastro de pessoa) |
-| GET | `/api/{cadastro}/:id` | Detalhe |
-| GET | `/api/{cadastro}/:id/historico` | Histórico de auditoria do registro |
-| POST | `/api/{cadastro}` | Cadastra |
-| PUT | `/api/{cadastro}/:id` | Edita |
-| DELETE | `/api/{cadastro}/:id` | Exclui (soft delete); corpo: `{ "motivo": "..." }` |
-| POST | `/api/{cadastro}/:id/restaurar` | Restaura um registro excluído |
-| GET | `/api/empresas/:id/documentos` | Documentos da empresa (`?status=excluidos` para removidos) |
-| POST | `/api/empresas/:id/documentos` | Anexa um documento (`multipart/form-data`: `arquivo`, `tipo`, `descricao`, `validade`) |
-| GET | `/api/empresas/:id/documentos/:doc/arquivo` | Visualiza o arquivo (`?download=1` para baixar) |
-| DELETE | `/api/empresas/:id/documentos/:doc` | Remove o documento (soft delete); corpo: `{ "motivo": "..." }` |
-| POST | `/api/empresas/:id/documentos/:doc/restaurar` | Restaura um documento removido |
-| GET | `/api/documentos/tipos` | Tipos de documento e formatos aceitos |
-| GET | `/api/documentos/vencimentos` | Documentos vencidos ou a vencer (`?dias=30`, de 1 a 365) |
-| GET | `/api/auditoria` | Todas as ações (filtros: `entidade`, `acao`, `usuario`, `pagina`) |
-| GET | `/api/resumo` | Totais exibidos no painel |
+### Backup, dump ou seed?
 
-`{cadastro}` é `empresas` ou `pessoas`. Fora as rotas públicas, todas exigem
-`Authorization: Bearer <token>`.
+- Backup é uma cópia de segurança dos dados reais, para recuperar se algo der errado. Neste projeto
+  fica na pasta `backups/`.
+- Dump é o banco exportado para um arquivo com o `pg_dump`. Os backups deste projeto são dumps
+  (arquivos `.dump`).
+- Seed são os dados que o próprio sistema cadastra para não começar vazio.
 
-Respostas de erro: `400` (dados inválidos, com `erros` por campo), `401` (sem login ou token vencido),
-`403` (sem permissão ou senha provisória), `404` (não encontrado), `409` (duplicado ou registro excluído),
-`410` (código de acesso expirado: entrar de novo), `429` (muitas tentativas), `500` (erro interno),
-`503` (storage de arquivos ou envio de e-mail indisponível).
+Aqui o nome certo é seed, porque esses dados não vieram de nenhum banco, foram criados só para
+demonstração. Um dump também ficaria com a estrutura do banco do dia em que foi gerado, e o seed
+sempre passa pelas migrations e validações atuais.
 
-## Testes
+## Documentação
 
-```bash
-npm test              # front-end
-cd api && npm test    # API: testes de segurança (senhas e tokens)
-```
+- [docs/seguranca.md](docs/seguranca.md): login, sessões, MFA, recuperação de senha, Google e variáveis de ambiente
+- [docs/api.md](docs/api.md): endpoints da API
+- [docs/operacao.md](docs/operacao.md): documentos, backup, como rodar sem Docker, testes e pastas do projeto

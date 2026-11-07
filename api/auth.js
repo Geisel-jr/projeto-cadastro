@@ -147,9 +147,14 @@ function rotasAuth({ pool }) {
     await auditarAcesso(pool, req, 'LOGIN_FALHOU', usuario, { usuario: emailInformado.slice(0, 100), motivo });
   };
 
-  // Configuração pública usada pela tela de login
-  router.get('/config', (req, res) => {
-    res.json({ googleClientId: GOOGLE_CLIENT_ID });
+  // Configuração pública usada pela tela de login. "demo" só vem enquanto a conta de
+  // demonstração existe, está ativa e ainda usa a senha pública (ver criarAdministradorInicial).
+  router.get('/config', async (req, res) => {
+    const { rows } = await pool.query('SELECT email FROM usuarios WHERE demo AND ativo ORDER BY id LIMIT 1');
+    res.json({
+      googleClientId: GOOGLE_CLIENT_ID,
+      demo: rows[0] ? { email: rows[0].email, senha: CONTA_DEMO.senha } : null,
+    });
   });
 
   // ---------- Login com e-mail e senha ----------
@@ -319,7 +324,7 @@ function rotasAuth({ pool }) {
     const hash = await gerarHash(novaSenha);
     const atualizado = await emTransacao(pool, async (db) => {
       const { rows } = await db.query(
-        `UPDATE usuarios SET senha_hash = $1, deve_trocar_senha = FALSE, atualizado_em = NOW()
+        `UPDATE usuarios SET senha_hash = $1, deve_trocar_senha = FALSE, demo = FALSE, atualizado_em = NOW()
          WHERE id = $2 RETURNING *`,
         [hash, usuario.id]
       );
@@ -335,13 +340,29 @@ function rotasAuth({ pool }) {
   return router;
 }
 
-// Cria o primeiro administrador quando a tabela de usuários está vazia.
-// A senha inicial é provisória: no primeiro login o sistema exige a troca.
+// Conta usada quando o .env não define o primeiro administrador. Os dados aparecem na tela
+// de login, para quem clonou o projeto entrar e ver o sistema já com dados de exemplo.
+const CONTA_DEMO = { nome: 'Usuário Demonstração', email: 'demo@cadastrohub.local', senha: 'Demo@2026' };
+
+// Cria o primeiro usuário quando a tabela de usuários está vazia (primeira subida).
+// Devolve true nesse caso, para o servidor saber que também deve popular os dados de exemplo.
+// - ADMIN_EMAIL vazio: cria a conta de demonstração (administrador, senha pública e fixa).
+// - ADMIN_EMAIL preenchido: cria esse administrador com senha provisória (troca no primeiro login).
 async function criarAdministradorInicial(pool) {
   const { rows } = await pool.query('SELECT COUNT(*)::int AS total FROM usuarios');
-  if (rows[0].total > 0) return;
+  if (rows[0].total > 0) return false;
 
-  const email = process.env.ADMIN_EMAIL || 'admin@cadastrohub.local';
+  const email = process.env.ADMIN_EMAIL;
+  if (!email) {
+    await pool.query(
+      `INSERT INTO usuarios (nome, email, senha_hash, papel, deve_trocar_senha, demo, criado_por)
+       VALUES ($1, $2, $3, 'admin', FALSE, TRUE, 'sistema')`,
+      [CONTA_DEMO.nome, CONTA_DEMO.email, await gerarHash(CONTA_DEMO.senha)]
+    );
+    console.log(`👤 Conta de demonstração criada: ${CONTA_DEMO.email} (os dados de acesso aparecem na tela de login)`);
+    return true;
+  }
+
   const senha = process.env.ADMIN_PASSWORD || crypto.randomBytes(9).toString('base64url');
   await pool.query(
     `INSERT INTO usuarios (nome, email, senha_hash, papel, deve_trocar_senha, criado_por)
@@ -350,6 +371,7 @@ async function criarAdministradorInicial(pool) {
   );
   console.log(`👤 Administrador inicial criado: ${email}`);
   if (!process.env.ADMIN_PASSWORD) console.log(`   Senha provisória: ${senha} (troque no primeiro acesso)`);
+  return true;
 }
 
 module.exports = {

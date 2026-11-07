@@ -61,6 +61,7 @@ jobs:
       JWT_SECRET: segredo-da-ci-com-tamanho-suficiente-para-assinar-tokens
       ADMIN_EMAIL: admin@ci.local
       ADMIN_PASSWORD: SenhaProvisoria1
+      DADOS_EXEMPLO: "false" # os testes contam registros a partir de um banco vazio
     steps:
       - uses: actions/checkout@v4
 

@@ -53,10 +53,11 @@ services:
       MINIO_BUCKET: documentos
       # Autenticação (valores reais no arquivo .env, que não vai para o git)
       JWT_SECRET: ${JWT_SECRET:-}
-      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@cadastrohub.local}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-} # vazio = conta de demonstração (dados de acesso na tela de login)
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      DADOS_EXEMPLO: ${DADOS_EXEMPLO:-true} # empresas, pessoas e documentos de exemplo na primeira subida
       MFA_ADMIN: ${MFA_ADMIN:-true} # administradores confirmam o login com código por e-mail
       # E-mail (recuperação de senha). Padrão: Mailpit local; em produção, um SMTP real
       APP_URL: ${APP_URL:-http://localhost:3000}

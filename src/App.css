@@ -971,6 +971,23 @@ button.link-voltar-acesso, .link-reenviar { padding: 0; border: 0; background: n
 }
 .aviso-info { background: var(--acento-suave); color: var(--acento-hover); border: 1px solid #d5def7; }
 
+/* Conta de demonstração: dados para copiar e colar no formulário */
+.acesso-demo {
+  display: grid; gap: .4rem; padding: .7rem .85rem;
+  border: 1px dashed var(--borda-forte); border-radius: var(--raio); background: var(--superficie-2);
+}
+.acesso-demo-titulo { display: flex; align-items: center; gap: .4rem; color: var(--texto-2); font-size: 12.5px; font-weight: 500; }
+.acesso-demo dl { display: grid; gap: .25rem; margin: 0; }
+.acesso-demo-linha { display: grid; grid-template-columns: 3.5rem minmax(0, 1fr) auto; align-items: center; gap: .5rem; }
+.acesso-demo dt { color: var(--texto-3); font-size: 12.5px; }
+.acesso-demo dd { margin: 0; font-family: var(--fonte-mono); font-size: 13px; overflow-wrap: anywhere; }
+.btn-copiar {
+  padding: .15rem .45rem; border: 1px solid var(--borda); border-radius: var(--raio-p);
+  background: var(--superficie); color: var(--texto-2); font-size: 12px; font-weight: 500;
+  transition: color var(--rapido) ease, border-color var(--rapido) ease;
+}
+@media (hover: hover) { .btn-copiar:hover { color: var(--texto); border-color: var(--borda-forte); } }
+
 @media (hover: hover) {
   .link-esqueci:hover, .link-reenviar:not(:disabled):hover { text-decoration: underline; }
   .link-voltar-acesso:hover { color: var(--texto); }

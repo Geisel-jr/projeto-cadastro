@@ -158,6 +158,28 @@ test('senha provisória exige a troca antes de mostrar o sistema', async () => {
   expect(screen.queryByRole('heading', { name: 'Painel' })).not.toBeInTheDocument();
 });
 
+test('sem conta de demonstração, a tela de login não mostra dados de acesso', async () => {
+  render(<App />);
+  expect(await screen.findByRole('heading', { name: 'Entrar' })).toBeInTheDocument();
+  expect(screen.queryByText('Conta de demonstração')).not.toBeInTheDocument();
+});
+
+test('conta de demonstração aparece na tela de login, sem preencher o formulário', async () => {
+  const fetchPadrao = global.fetch;
+  global.fetch = jest.fn((url, opcoes) => (url.includes('/auth/config')
+    ? resposta(200, { googleClientId: null, demo: { email: 'demo@cadastrohub.local', senha: 'Demo@2026' } })
+    : fetchPadrao(url, opcoes)));
+
+  render(<App />);
+  expect(await screen.findByText('Conta de demonstração')).toBeInTheDocument();
+  expect(screen.getByText('demo@cadastrohub.local')).toBeInTheDocument();
+  expect(screen.getByText('Demo@2026')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Copiar senha' })).toBeInTheDocument();
+  // a pessoa ainda precisa colar os dados
+  expect(screen.getByLabelText('E-mail')).toHaveValue('');
+  expect(screen.getByLabelText('Senha')).toHaveValue('');
+});
+
 const desafioFalso = { desafio: 'abc', email: 'an***@empresa.com', minutos: 10, reenviarEm: 30, reenvios: 2 };
 
 test('administrador confirma o login com o código enviado por e-mail', async () => {

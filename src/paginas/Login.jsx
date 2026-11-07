@@ -26,12 +26,16 @@ export default function Login({ onEntrar }) {
   const [erro, setErro] = useState(null);
   const [enviando, setEnviando] = useState(null); // 'senha' | 'google' | null
   const [googleClientId, setGoogleClientId] = useState(null);
+  const [demo, setDemo] = useState(null); // conta de demonstração, só quando ela existe
   const [desafio, setDesafio] = useState(null); // administradores: falta o código enviado por e-mail
   const formulario = useRef(null);
   const campoEmail = useRef(null);
 
   useEffect(() => {
-    conta.configuracao().then((c) => setGoogleClientId(c.googleClientId)).catch(() => {});
+    conta.configuracao().then((c) => {
+      setGoogleClientId(c.googleClientId);
+      setDemo(c.demo || null);
+    }).catch(() => {});
   }, []);
 
   const falhar = (err) => {
@@ -96,6 +100,8 @@ export default function Login({ onEntrar }) {
         <h1>Entrar</h1>
         <p className="login-subtitulo">Use o e-mail cadastrado pelo administrador.</p>
 
+        {demo && <AcessoDemonstracao demo={demo} />}
+
         {erro && (
           <div className="aviso aviso-erro" role="alert">
             <Icone nome="alerta" />
@@ -150,6 +156,47 @@ export default function Login({ onEntrar }) {
         </p>
       </form>
     </LayoutAcesso>
+  );
+}
+
+// Dados da conta de demonstração (só aparece enquanto ela existe com a senha pública).
+// Não preenche o formulário: a pessoa copia e cola, como faria com uma conta real.
+function AcessoDemonstracao({ demo }) {
+  const [copiado, setCopiado] = useState(null);
+
+  const copiar = async (campo, valor) => {
+    try {
+      await navigator.clipboard.writeText(valor);
+      setCopiado(campo);
+      setTimeout(() => setCopiado((atual) => (atual === campo ? null : atual)), 1500);
+    } catch {
+      // Sem acesso à área de transferência: seleciona o texto para o Ctrl+C
+      window.getSelection()?.selectAllChildren(document.getElementById(`demo-${campo}`));
+    }
+  };
+
+  return (
+    <div className="acesso-demo" role="note" aria-labelledby="acesso-demo-titulo">
+      <p className="acesso-demo-titulo" id="acesso-demo-titulo">
+        <Icone nome="chave" tamanho={14} /> Conta de demonstração
+      </p>
+      <dl>
+        {[['email', 'E-mail', demo.email], ['senha', 'Senha', demo.senha]].map(([campo, rotulo, valor]) => (
+          <div className="acesso-demo-linha" key={campo}>
+            <dt>{rotulo}</dt>
+            <dd id={`demo-${campo}`}>{valor}</dd>
+            <button
+              type="button"
+              className="btn-copiar"
+              onClick={() => copiar(campo, valor)}
+              aria-label={copiado === campo ? `${rotulo} copiado` : `Copiar ${rotulo.toLowerCase()}`}
+            >
+              {copiado === campo ? 'Copiado' : 'Copiar'}
+            </button>
+          </div>
+        ))}
+      </dl>
+    </div>
   );
 }
 

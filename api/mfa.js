@@ -18,7 +18,9 @@ const MAX_DESAFIOS = 5;      // logins com senha certa por usuário a cada 15 mi
 
 const ENCERRADO = 'Este código expirou. Entre de novo para receber outro.';
 
-const exigeMfa = (usuario) => ATIVO && usuario.papel === 'admin';
+// A conta de demonstração fica de fora: a senha dela é pública (aparece na tela de login) e o
+// e-mail não existe, então o código não protegeria nada e só impediria a entrada.
+const exigeMfa = (usuario) => ATIVO && usuario.papel === 'admin' && !usuario.demo;
 
 const gerarCodigo = () => String(crypto.randomInt(0, 1000000)).padStart(6, '0');
 

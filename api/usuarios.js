@@ -113,7 +113,7 @@ function rotasUsuarios({ pool }) {
     await emTransacao(pool, async (db) => {
       const usuario = await buscar(db, id, true);
       await db.query(
-        'UPDATE usuarios SET senha_hash = $1, deve_trocar_senha = TRUE, atualizado_em = NOW() WHERE id = $2',
+        'UPDATE usuarios SET senha_hash = $1, deve_trocar_senha = TRUE, demo = FALSE, atualizado_em = NOW() WHERE id = $2',
         [hash, id]
       );
       await revogarSessoesDoUsuario(db, id);
