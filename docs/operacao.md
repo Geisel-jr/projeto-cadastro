@@ -102,6 +102,7 @@ cadastros, documentos, backup, recuperação de senha e o código de acesso.
 │   ├── validacoes.js     # Validação dos dados recebidos
 │   ├── db.js             # Conexão com o banco e migrations
 │   ├── util.js           # Funções comuns (transação, auditoria, erros HTTP)
+│   ├── openapi.js        # Descrição da API mostrada pelo Swagger em /api/docs
 │   ├── seeds.js          # Cadastra os dados de exemplo na primeira vez
 │   ├── seeds/            # Dados de exemplo (empresas, pessoas e documentos fictícios)
 │   └── migrations/       # Scripts SQL que criam e atualizam o banco

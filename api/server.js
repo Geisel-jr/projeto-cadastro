@@ -16,6 +16,9 @@ const { rotasUsuarios } = require('./usuarios');
 const { rotasRecuperacao, limparPedidosAntigos } = require('./recuperacao');
 const { limparDesafiosAntigos } = require('./mfa');
 const { popularDadosExemplo } = require('./seeds');
+const { prepararSegredo } = require('./tokens');
+const swaggerUi = require('swagger-ui-express');
+const especificacao = require('./openapi');
 
 const app = express();
 
@@ -58,6 +61,10 @@ app.get('/api/health', async (req, res) => {
     res.status(503).json({ status: 'erro', error: 'Banco de dados indisponível.' });
   }
 });
+
+// Documentação interativa da API (Swagger), pública. A descrição está em openapi.js.
+app.get('/api/docs/openapi.json', (req, res) => res.json(especificacao));
+app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(especificacao, { customSiteTitle: 'CadastroHub · API' }));
 
 // ========== AUTENTICAÇÃO (rotas públicas) ==========
 
@@ -255,6 +262,7 @@ const PORT = process.env.PORT || 5000;
 
 migrar()
   .then(async () => {
+    await prepararSegredo(pool);
     const primeiraSubida = await criarAdministradorInicial(pool); // true só com o banco ainda sem usuários
     await prepararStorage();
     // Dados de exemplo só na primeira subida: um banco que já tem dados nunca recebe o seed

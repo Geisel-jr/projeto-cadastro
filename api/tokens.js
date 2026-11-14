@@ -2,9 +2,22 @@ const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 
 // Segredo usado para assinar os JWT. Em produção deve vir do ambiente (JWT_SECRET).
-const SEGREDO = process.env.JWT_SECRET || crypto.randomBytes(48).toString('base64');
-if (!process.env.JWT_SECRET) {
-  console.warn('⚠️  JWT_SECRET não definido: usando um segredo temporário (sessões caem ao reiniciar a API).');
+// Sem ele, prepararSegredo() gera um na primeira subida e guarda no banco.
+let SEGREDO = process.env.JWT_SECRET || null;
+
+// Roda antes do servidor aceitar requisições. Com o segredo no banco, as sessões continuam
+// valendo quando a API reinicia (com um segredo temporário, todo mundo seria deslogado).
+// O backup do banco passa a conter o segredo; por isso, em produção, defina JWT_SECRET.
+async function prepararSegredo(pool) {
+  if (SEGREDO) return;
+  const { rows } = await pool.query(
+    `INSERT INTO configuracoes (chave, valor) VALUES ('jwt_secret', $1)
+     ON CONFLICT (chave) DO UPDATE SET chave = EXCLUDED.chave
+     RETURNING valor`,
+    [crypto.randomBytes(48).toString('base64url')]
+  );
+  SEGREDO = rows[0].valor;
+  console.log('🔑 JWT_SECRET não definido: usando o segredo gerado na primeira subida e guardado no banco.');
 }
 
 const OPCOES = { issuer: 'cadastrohub-api', audience: 'cadastrohub-web' };
@@ -43,4 +56,6 @@ const hashToken = (token) => crypto.createHash('sha256').update(token).digest('h
 // simples seria quebrado testando todas as combinações; sem o segredo, isso não é possível.
 const assinar = (valor) => crypto.createHmac('sha256', SEGREDO).update(valor).digest('hex');
 
-module.exports = { gerarTokenAcesso, verificarTokenAcesso, gerarTokenRenovacao, hashToken, assinar, DIAS_RENOVACAO };
+module.exports = {
+  prepararSegredo, gerarTokenAcesso, verificarTokenAcesso, gerarTokenRenovacao, hashToken, assinar, DIAS_RENOVACAO,
+};

@@ -173,6 +173,8 @@ jobs:
           esperar "Senha antiga não entra mais" "$(status -X POST $URL/auth/login -H "$J" -d '{"email":"admin@ci.local","senha":"SenhaDefinitiva2"}')" 401
           esperar "Senha nova entra (e pede o código)" "$(curl -s -X POST $URL/auth/login -H "$J" -d '{"email":"admin@ci.local","senha":"RecuperadaNaCI3"}' | grep -c '"desafio"')" 1
 
+          esperar "Documentação da API (Swagger) responde" "$(status http://localhost:3000/api/docs/)" 200
+          esperar "Descrição OpenAPI disponível" "$(curl -s $URL/docs/openapi.json | grep -c '"openapi":"3')" 1
           esperar "Front envia o cabeçalho CSP" "$(curl -sI http://localhost:3000 | grep -ci 'content-security-policy')" 1
 
           echo "✅ Todos os testes passaram"

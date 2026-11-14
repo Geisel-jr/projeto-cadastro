@@ -70,10 +70,14 @@ configurações de desenvolvimento, cria um usuário de demonstração e já cad
 Depois é só abrir http://localhost:3000. O e-mail e a senha do usuário de demonstração aparecem na
 tela de login, basta copiar e colar.
 
+Sem configurar um Gmail, os e-mails do sistema não são enviados de verdade. O link do "esqueci minha
+senha" e o código de acesso dos administradores aparecem no Mailpit, em http://localhost:8025.
+
 Outros endereços:
 
 | Endereço | O que tem |
 | --- | --- |
+| http://localhost:3000/api/docs | Documentação da API (Swagger), onde dá para testar as rotas |
 | http://localhost:8025 | E-mails enviados pelo sistema (Mailpit) |
 | http://localhost:9001 | Arquivos no MinIO (usuário `minioadmin`, senha `minioadmin123`) |
 | http://localhost:5000/api/health | Se a API e o banco estão funcionando |
@@ -115,5 +119,5 @@ sempre passa pelas migrations e validações atuais.
 ## Documentação
 
 - [docs/seguranca.md](docs/seguranca.md): login, sessões, MFA, recuperação de senha, Google e variáveis de ambiente
-- [docs/api.md](docs/api.md): endpoints da API
+- [docs/api.md](docs/api.md): endpoints da API (a versão interativa fica em http://localhost:3000/api/docs)
 - [docs/operacao.md](docs/operacao.md): documentos, backup, como rodar sem Docker, testes e pastas do projeto

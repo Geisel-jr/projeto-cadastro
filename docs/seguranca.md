@@ -112,7 +112,7 @@ Todas estão no `.env.example`.
 
 | Variável | Para que serve |
 | --- | --- |
-| `JWT_SECRET` | Segredo que assina os tokens. Use um valor aleatório e longo |
+| `JWT_SECRET` | Segredo que assina os tokens. Vazio = o sistema gera um na primeira vez e guarda no banco. Em produção, defina um valor aleatório e longo (assim ele não fica no backup) |
 | `ADMIN_EMAIL` / `ADMIN_PASSWORD` | Primeiro usuário, criado só com o banco vazio. Vazio = usuário de demonstração |
 | `DADOS_EXEMPLO` | `true` (padrão): cadastra os dados de exemplo na primeira vez |
 | `GOOGLE_CLIENT_ID` | Liga o login com Google |

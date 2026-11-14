@@ -24,7 +24,8 @@
     "minio": "^8.0.7",
     "multer": "^2.4.0",
     "nodemailer": "^10.2.1",
-    "pg": "^8.23.1"
+    "pg": "^8.23.1",
+    "swagger-ui-express": "^5.0.1"
   },
   "devDependencies": {
     "nodemon": "^3.1.14"

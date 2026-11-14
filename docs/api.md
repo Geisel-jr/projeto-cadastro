@@ -2,6 +2,9 @@
 
 [Voltar ao README](../README.md)
 
+Com o sistema rodando, a documentação interativa (Swagger) fica em http://localhost:3000/api/docs. Lá dá
+para testar cada rota: faça o login em `POST /auth/login`, copie o `tokenAcesso` e cole em "Authorize".
+
 `{cadastro}` pode ser `empresas` ou `pessoas`. As rotas marcadas como públicas funcionam sem login; as
 outras precisam do cabeçalho `Authorization: Bearer <token>`.
 
