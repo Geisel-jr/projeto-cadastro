@@ -1,10 +1,14 @@
 const express = require('express');
 const { validar } = require('./validacoes');
 const { paraSnake, linhaParaObjeto, emTransacao, registrarAuditoria, lerId, lerMotivo, ErroHttp } = require('./util');
+const { gerarCsv, COLUNAS_EXCLUSAO } = require('./exportacao');
+
+const LIMITE_EXPORTACAO = 10000; // linhas por planilha
 
 // Cria as rotas de um cadastro (empresas ou pessoas):
 //
 //   GET    /                  lista paginada (?status=excluidos&q=&pagina=&limite=&ordem=&direcao=)
+//   GET    /exportar          a lista filtrada em CSV (planilha), registrada na auditoria
 //   GET    /opcoes            id e nome de todos os ativos (para campos de seleção)
 //   GET    /:id               detalhe
 //   GET    /:id/historico     histórico de auditoria do registro
@@ -18,7 +22,10 @@ const { paraSnake, linhaParaObjeto, emTransacao, registrarAuditoria, lerId, lerM
 //   busca:     { texto: [colunas comparadas sem acento], digitos: [colunas só com números] }
 //   ordenacao: { chave da URL: expressão SQL } — só estas colunas podem ser usadas para ordenar
 //   opcoes:    expressões SQL do "nome" devolvido em /opcoes
-function rotasCadastro({ pool, tabela, regras, consulta, verificar, busca, ordenacao, opcoes }) {
+//   exportacao:  colunas da planilha ({ campo, titulo, formato }), ver exportacao.js
+//   privacidade: { mascarar(registro) } para dados pessoais. A lista vem mascarada e cada
+//                abertura do detalhe fica registrada na auditoria (LGPD)
+function rotasCadastro({ pool, tabela, regras, consulta, verificar, busca, ordenacao, opcoes, exportacao, privacidade }) {
   const router = express.Router();
   const campos = regras.map((regra) => regra.campo);
   const colunas = campos.map(paraSnake);
@@ -44,14 +51,14 @@ function rotasCadastro({ pool, tabela, regras, consulta, verificar, busca, orden
   const auditar = (db, req, registroId, acao, dados) =>
     registrarAuditoria(db, req, { entidade: tabela, registroId, acao, ...dados });
 
-  router.get('/', async (req, res) => {
-    const excluidos = req.query.status === 'excluidos';
-    const limite = Math.min(Math.max(Number(req.query.limite) || 20, 1), 100);
+  // Filtro (excluídos e busca) e ordenação vindos da URL. Usado pela lista e pela exportação.
+  function filtrarPelaUrl(query) {
+    const excluidos = query.status === 'excluidos';
     const condicoes = [`t.excluido_em IS ${excluidos ? 'NOT ' : ''}NULL`];
     const parametros = [];
 
     // Busca: texto sem acentos em várias colunas; números também nos documentos e telefones
-    const termo = String(req.query.q ?? '').trim().slice(0, 100);
+    const termo = String(query.q ?? '').trim().slice(0, 100);
     if (termo && busca) {
       parametros.push(`%${termo}%`);
       const posicaoTexto = parametros.length;
@@ -68,9 +75,22 @@ function rotasCadastro({ pool, tabela, regras, consulta, verificar, busca, orden
 
     // Ordenação só por colunas permitidas (nada da URL entra direto no SQL)
     const padrao = excluidos ? 't.excluido_em DESC' : 't.id DESC';
-    const coluna = ordenacao?.[req.query.ordem];
-    const direcao = req.query.direcao === 'desc' ? 'DESC' : 'ASC';
+    const coluna = ordenacao?.[query.ordem];
+    const direcao = query.direcao === 'desc' ? 'DESC' : 'ASC';
     const ordem = coluna ? `${coluna} ${direcao} NULLS LAST, t.id DESC` : padrao;
+
+    return { excluidos, termo, onde, parametros, ordem };
+  }
+
+  // Na lista, dados pessoais vão mascarados (LGPD); o completo só no detalhe, que fica registrado
+  const paraLista = (linha) => {
+    const registro = linhaParaObjeto(linha);
+    return privacidade ? privacidade.mascarar(registro) : registro;
+  };
+
+  router.get('/', async (req, res) => {
+    const limite = Math.min(Math.max(Number(req.query.limite) || 20, 1), 100);
+    const { onde, parametros, ordem } = filtrarPelaUrl(req.query);
 
     const { rows: [{ total }] } = await pool.query(
       `SELECT COUNT(*)::int AS total FROM (${consulta} ${onde}) filtrados`, parametros
@@ -82,7 +102,28 @@ function rotasCadastro({ pool, tabela, regras, consulta, verificar, busca, orden
       `${consulta} ${onde} ORDER BY ${ordem} LIMIT ${limite} OFFSET ${(pagina - 1) * limite}`,
       parametros
     );
-    res.json({ itens: rows.map(linhaParaObjeto), total, pagina, paginas, limite });
+    res.json({ itens: rows.map(paraLista), total, pagina, paginas, limite });
+  });
+
+  // Planilha (CSV) com tudo o que a lista filtrada mostra, sem paginação. Vai para a auditoria,
+  // porque leva os dados completos (inclusive CPF) para fora do sistema.
+  router.get('/exportar', async (req, res) => {
+    if (!exportacao) throw new ErroHttp(404, 'Não disponível.');
+    const { excluidos, termo, onde, parametros, ordem } = filtrarPelaUrl(req.query);
+    const { rows } = await pool.query(
+      `${consulta} ${onde} ORDER BY ${ordem} LIMIT ${LIMITE_EXPORTACAO}`, parametros
+    );
+    const colunas = excluidos ? [...exportacao, ...COLUNAS_EXCLUSAO] : exportacao;
+    const csv = gerarCsv(colunas, rows.map(linhaParaObjeto));
+
+    await registrarAuditoria(pool, req, {
+      entidade: tabela, registroId: 0, acao: 'EXPORTAR',
+      depois: { total: rows.length, lista: excluidos ? 'excluidos' : 'ativos', busca: termo || null },
+    });
+    const hoje = new Date().toISOString().slice(0, 10);
+    res.set('Content-Type', 'text/csv; charset=utf-8');
+    res.set('Content-Disposition', `attachment; filename="${tabela}${excluidos ? '-excluidos' : ''}-${hoje}.csv"`);
+    res.send(csv);
   });
 
   // Lista curta (id e nome) de todos os ativos, para campos de seleção em outros formulários
@@ -96,8 +137,26 @@ function rotasCadastro({ pool, tabela, regras, consulta, verificar, busca, orden
   });
 
   router.get('/:id', async (req, res) => {
-    res.json(await buscarOuFalhar(pool, lerId(req.params.id)));
+    const id = lerId(req.params.id);
+    const registro = await buscarOuFalhar(pool, id);
+    if (privacidade) await registrarLeitura(req, registro);
+    res.json(registro);
   });
+
+  // LGPD: registra quem abriu os dados completos. Uma vez a cada 10 minutos por pessoa e
+  // registro, para abrir e fechar o formulário várias vezes não encher a auditoria.
+  // Guarda só o nome (para o histórico mostrar de quem eram os dados), nunca o CPF.
+  const registrarLeitura = (req, registro) =>
+    pool.query(
+      `INSERT INTO auditoria (entidade, registro_id, acao, usuario, usuario_id, ip, dados_novos)
+       SELECT $1::varchar, $2::int, 'VISUALIZAR', $3, $4::int, $5, $6::jsonb
+        WHERE NOT EXISTS (
+          SELECT 1 FROM auditoria
+           WHERE entidade = $1::varchar AND registro_id = $2::int AND acao = 'VISUALIZAR'
+             AND usuario_id = $4::int AND data > NOW() - INTERVAL '10 minutes')`,
+      [tabela, registro.id, req.usuario, req.usuarioId, req.ipOrigem,
+        JSON.stringify({ nome: registro.nome, nomeSocial: registro.nomeSocial ?? null })]
+    );
 
   router.get('/:id/historico', async (req, res) => {
     const { rows } = await pool.query(

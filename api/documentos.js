@@ -183,4 +183,31 @@ function rotasDocumentos({ pool }) {
   return router;
 }
 
-module.exports = { rotasDocumentos, TIPOS_DOCUMENTO, TIPOS_ARQUIVO, TAMANHO_MAXIMO };
+// Documentos vencidos ou que vencem nos próximos N dias. Usado pelo painel e pelo aviso por e-mail.
+// Considera só o documento mais recente de cada tipo por empresa: se a empresa já
+// anexou uma certidão nova e válida, a antiga (vencida) não gera alerta.
+async function buscarVencimentos(pool, dias = 30) {
+  const { rows } = await pool.query(
+    `SELECT * FROM (
+       SELECT DISTINCT ON (d.empresa_id, d.tipo, COALESCE(d.descricao, ''))
+              d.id, d.empresa_id, d.tipo, d.descricao, d.validade, d.nome_arquivo,
+              COALESCE(e.nome_fantasia, e.nome) AS empresa_nome,
+              (d.validade - CURRENT_DATE) AS dias_restantes
+         FROM documentos d
+         JOIN empresas e ON e.id = d.empresa_id
+        WHERE d.excluido_em IS NULL AND e.excluido_em IS NULL AND d.validade IS NOT NULL
+        ORDER BY d.empresa_id, d.tipo, COALESCE(d.descricao, ''), d.validade DESC
+     ) recentes
+     WHERE validade <= CURRENT_DATE + $1::int
+     ORDER BY validade, empresa_nome`,
+    [dias]
+  );
+  return {
+    dias,
+    vencidos: rows.filter((r) => r.dias_restantes < 0).length,
+    aVencer: rows.filter((r) => r.dias_restantes >= 0).length,
+    itens: rows.map(linhaParaObjeto),
+  };
+}
+
+module.exports = { rotasDocumentos, buscarVencimentos, TIPOS_DOCUMENTO, TIPOS_ARQUIVO, TAMANHO_MAXIMO };

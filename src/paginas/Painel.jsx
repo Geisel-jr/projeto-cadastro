@@ -11,12 +11,30 @@ const hoje = () => {
   return texto.charAt(0).toUpperCase() + texto.slice(1);
 };
 
-export default function Painel({ onNavegar }) {
+export default function Painel({ usuario, onNavegar, notificar }) {
   useTituloPagina('Painel');
   const [resumo, setResumo] = useState(null);
   const [atividades, setAtividades] = useState(null);
   const [vencimentos, setVencimentos] = useState(null);
   const [erro, setErro] = useState(null);
+  const [enviandoAviso, setEnviandoAviso] = useState(false);
+
+  const enviarAviso = async () => {
+    setEnviandoAviso(true);
+    try {
+      const { enviados } = await documentos.enviarAviso();
+      if (enviados === 0) {
+        // Acontece quando o único administrador é a conta de demonstração (que não tem e-mail real)
+        notificar('erro', 'Nenhum e-mail enviado', 'Não há administrador com e-mail cadastrado para receber o aviso.');
+      } else {
+        notificar('sucesso', 'Aviso enviado', `E-mail enviado para ${enviados} ${enviados === 1 ? 'administrador' : 'administradores'}.`);
+      }
+    } catch (e) {
+      notificar('erro', 'Aviso não enviado', mensagemErro(e));
+    } finally {
+      setEnviandoAviso(false);
+    }
+  };
 
   useEffect(() => {
     Promise.all([api.resumo(), api.auditoria({ limite: 8 }), documentos.vencimentos(30)])
@@ -87,7 +105,13 @@ export default function Painel({ onNavegar }) {
       </div>
 
       <div className="painel-colunas">
-        {!erro && <Vencimentos dados={vencimentos} />}
+        {!erro && (
+          <Vencimentos
+            dados={vencimentos}
+            onEnviarAviso={usuario?.papel === 'admin' ? enviarAviso : undefined}
+            enviandoAviso={enviandoAviso}
+          />
+        )}
 
         <div className="painel atividade">
           <div className="painel-header">

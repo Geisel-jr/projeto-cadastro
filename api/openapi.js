@@ -82,8 +82,20 @@ function rotasCadastro(entidade, singular, schema) {
         responses: { 201: ok('Registro criado', schema), ...erros(400, 401, 409) },
       },
     },
+    [`/${entidade}/exportar`]: {
+      get: {
+        tags: [tag], summary: 'Baixa a lista filtrada em planilha (CSV para o Excel)',
+        description: 'Aceita os mesmos filtros da lista (status, q, ordem, direcao), sem paginação. Fica registrado na auditoria.',
+        parameters: ['status', 'q', 'ordem', 'direcao'].map((nome) => ({ name: nome, in: 'query', schema: { type: 'string' } })),
+        responses: { 200: { description: 'Arquivo CSV', content: { 'text/csv': { schema: { type: 'string' } } } }, ...erros(401) },
+      },
+    },
     [`/${entidade}/{id}`]: {
-      get: { tags: [tag], summary: `Detalhe de ${singular}`, parameters: [id()], responses: { 200: ok('Registro', schema), ...erros(401, 404) } },
+      get: {
+        tags: [tag], summary: `Detalhe de ${singular}`, parameters: [id()],
+        ...(entidade === 'pessoas' && { description: 'Traz o CPF completo (na lista ele vem mascarado). Cada abertura fica na auditoria (LGPD).' }),
+        responses: { 200: ok('Registro', schema), ...erros(401, 404) },
+      },
       put: {
         tags: [tag], summary: `Altera ${singular}`, parameters: [id()], requestBody: corpo(schema),
         responses: { 200: ok('Registro alterado', schema), ...erros(400, 401, 404, 409) },
@@ -301,6 +313,16 @@ module.exports = {
         tags: ['Documentos'], summary: 'Documentos vencidos ou perto de vencer',
         parameters: [{ name: 'dias', in: 'query', schema: { type: 'integer', default: 30, minimum: 1, maximum: 365 } }],
         responses: { 200: ok('Vencidos e a vencer'), ...erros(401) },
+      },
+    },
+    '/documentos/vencimentos/aviso': {
+      post: {
+        tags: ['Documentos'], summary: 'Manda agora o e-mail de vencimentos para os administradores (só administradores)',
+        description: 'O mesmo aviso sai sozinho uma vez por semana (AVISO_VENCIMENTOS no .env). Sem documentos para avisar, não envia nada.',
+        responses: {
+          200: ok('Resultado', { type: 'object', properties: { documentos: { type: 'integer' }, enviados: { type: 'integer' } } }),
+          ...erros(401, 403, 503),
+        },
       },
     },
 

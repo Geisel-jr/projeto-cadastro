@@ -84,6 +84,8 @@ export default function Auditoria({ onNavegar }) {
             <option value="REDEFINIR_SENHA">Redefinição de senha</option>
             <option value="PEDIDO_RECUPERACAO">Pedido de recuperação</option>
             <option value="RECUPERAR_SENHA">Senha recuperada por e-mail</option>
+            <option value="VISUALIZAR">Visualização de dados pessoais</option>
+            <option value="EXPORTAR">Exportação de planilha</option>
           </select>
         </div>
 

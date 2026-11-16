@@ -49,6 +49,8 @@ copie a pasta `backups/` para outro lugar, como um HD externo ou a nuvem.
 
 ## Como rodar sem Docker
 
+Precisa do Node.js 24 (a versão está no arquivo `.nvmrc`) e de um PostgreSQL.
+
 1. Crie o banco `cadastros_db` no seu PostgreSQL. As tabelas são criadas pela API quando ela inicia.
    Para os anexos funcionarem, suba só o MinIO com `docker compose up -d minio`.
 2. Rode a API:
@@ -63,14 +65,29 @@ copie a pasta `backups/` para outro lugar, como um HD externo ou a nuvem.
    npm install
    npm start
    ```
-   O front abre em http://localhost:3000 e usa a API em `http://localhost:5000/api`.
+   O Vite abre o front em http://localhost:3000, que usa a API em `http://localhost:5000/api`. Para
+   apontar para outro endereço, use a variável `VITE_API_URL`.
 
 ## Testes
 
 ```bash
-npm test              # front-end
-cd api && npm test    # API: testes de senhas e tokens
+npm test                       # front-end (Vitest)
+cd api && npm test             # API: senhas, tokens e documentação
+cd api && npm run test:integracao   # API de verdade conversando com um banco de teste
 ```
+
+Os testes de integração sobem a API e testam as regras pelo HTTP: login e código de acesso, permissões,
+cadastro com validação e CNPJ duplicado, exclusão e restauração, auditoria que não pode ser apagada,
+CPF mascarado, exportação e aviso de vencimentos. Eles precisam de um PostgreSQL. O jeito mais simples é
+subir um só para isso:
+
+```bash
+docker run -d --rm --name pg-teste -e POSTGRES_PASSWORD=postgres -p 5434:5432 postgres:16-alpine
+cd api && TESTE_DB_PORT=5434 npm run test:integracao
+docker stop pg-teste
+```
+
+Eles criam e apagam um banco chamado `cadastros_teste` e nunca mexem no `cadastros_db`.
 
 No GitHub Actions, a cada push, o CI roda esses testes, sobe o sistema inteiro no Docker e testa login,
 cadastros, documentos, backup, recuperação de senha e o código de acesso.
@@ -87,7 +104,8 @@ cadastros, documentos, backup, recuperação de senha e o código de acesso.
 │   ├── rotas.js          # Endereços das páginas e título da aba
 │   └── api.js            # Chamadas à API
 ├── api/                  # API Node.js/Express
-│   ├── server.js         # Configuração, segurança, auditoria e tratamento de erros
+│   ├── server.js         # Liga a API: migrations, primeiro usuário, seed e tarefas agendadas
+│   ├── app.js            # Rotas, segurança, auditoria e tratamento de erros
 │   ├── auth.js           # Login (senha e Google), sessões e proteção das rotas
 │   ├── usuarios.js       # Gestão de usuários (administrador)
 │   ├── recuperacao.js    # Esqueci minha senha (link por e-mail)
@@ -95,7 +113,8 @@ cadastros, documentos, backup, recuperação de senha e o código de acesso.
 │   ├── email.js          # Envio de e-mails (SMTP / Mailpit)
 │   ├── senhas.js         # Hash e regras de senha (scrypt)
 │   ├── tokens.js         # JWT de acesso e refresh tokens
-│   ├── test/             # Testes de senhas e tokens (node --test)
+│   ├── test/             # Testes de unidade (node --test)
+│   ├── integracao/       # Testes de integração (API + banco de teste)
 │   ├── cadastros.js      # Rotas de cadastro (com soft delete e auditoria)
 │   ├── documentos.js     # Rotas de documentos (envio, download, remoção e restauração)
 │   ├── storage.js        # Conexão com o MinIO
@@ -103,11 +122,15 @@ cadastros, documentos, backup, recuperação de senha e o código de acesso.
 │   ├── db.js             # Conexão com o banco e migrations
 │   ├── util.js           # Funções comuns (transação, auditoria, erros HTTP)
 │   ├── openapi.js        # Descrição da API mostrada pelo Swagger em /api/docs
+│   ├── exportacao.js     # Planilhas CSV e máscara do CPF na lista
+│   ├── avisos.js         # E-mail semanal de documentos vencendo
 │   ├── seeds.js          # Cadastra os dados de exemplo na primeira vez
 │   ├── seeds/            # Dados de exemplo (empresas, pessoas e documentos fictícios)
 │   └── migrations/       # Scripts SQL que criam e atualizam o banco
 ├── docs/                 # Esta documentação
 ├── backup/               # Imagem e scripts de backup e restauração (pg_dump + mc)
+├── index.html            # Página base do front (o Vite injeta o código)
+├── vite.config.js        # Configuração do Vite e dos testes do front
 ├── nginx.conf            # Servidor do front (repassa /api para a API)
 ├── dockerfile            # Imagem do front
 └── docker-compose.yml    # Sobe banco, MinIO, API, front, e-mail e backup juntos

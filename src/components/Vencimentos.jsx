@@ -10,19 +10,29 @@ function prazo(dias) {
   return { texto: `Vence em ${dias} dia${dias === 1 ? '' : 's'}`, classe: 'alerta' };
 }
 
-// Quadro do Painel com os documentos vencidos ou que vencem em breve (certidões, alvarás...)
-export default function Vencimentos({ dados }) {
+// Quadro do Painel com os documentos vencidos ou que vencem em breve (certidões, alvarás...).
+// "onEnviarAviso" só vem para administradores: manda agora o e-mail que sai toda semana.
+export default function Vencimentos({ dados, onEnviarAviso, enviandoAviso }) {
+  const temItens = dados && (dados.vencidos > 0 || dados.aVencer > 0);
   return (
     <section className="painel vencimentos" aria-labelledby="titulo-vencimentos">
       <div className="painel-header">
         <h2 id="titulo-vencimentos">Documentos a vencer</h2>
-        {dados && (dados.vencidos > 0 || dados.aVencer > 0) && (
+        {temItens && (
           <span className="vencimentos-totais">
             {dados.vencidos > 0 && <span className="selo perigo">{dados.vencidos} vencido{dados.vencidos > 1 ? 's' : ''}</span>}
             {dados.aVencer > 0 && <span className="selo alerta">{dados.aVencer} a vencer</span>}
           </span>
         )}
       </div>
+      {temItens && onEnviarAviso && (
+        <div className="vencimentos-aviso">
+          <span>Os administradores recebem esta lista por e-mail toda semana.</span>
+          <button className="btn-texto" onClick={onEnviarAviso} disabled={enviandoAviso}>
+            {enviandoAviso ? <><span className="spinner" /> Enviando...</> : 'Enviar agora'}
+          </button>
+        </div>
+      )}
 
       {!dados ? (
         <div className="painel-corpo"><span className="esq" /><span className="esq curto" /></div>

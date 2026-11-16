@@ -28,7 +28,8 @@ outras precisam do cabeçalho `Authorization: Bearer <token>`.
 | POST | `/api/usuarios/:id/redefinir-senha` | Define uma senha provisória (administrador) |
 | GET | `/api/{cadastro}` | Lista com páginas: `?status=excluidos&q=texto&pagina=1&limite=20&ordem=nome&direcao=asc`. Devolve `{ itens, total, pagina, paginas, limite }` |
 | GET | `/api/empresas/opcoes` | Id e nome das empresas ativas (usado no campo de empresa da pessoa) |
-| GET | `/api/{cadastro}/:id` | Um registro |
+| GET | `/api/{cadastro}/exportar` | Baixa a lista em planilha CSV, com os mesmos filtros da lista (fica na auditoria) |
+| GET | `/api/{cadastro}/:id` | Um registro. Para pessoas, traz o CPF completo e a abertura fica na auditoria |
 | GET | `/api/{cadastro}/:id/historico` | Histórico do registro na auditoria |
 | POST | `/api/{cadastro}` | Cadastra |
 | PUT | `/api/{cadastro}/:id` | Altera |
@@ -41,7 +42,8 @@ outras precisam do cabeçalho `Authorization: Bearer <token>`.
 | POST | `/api/empresas/:id/documentos/:doc/restaurar` | Restaura um documento removido |
 | GET | `/api/documentos/tipos` | Tipos de documento e formatos aceitos |
 | GET | `/api/documentos/vencimentos` | Documentos vencidos ou perto de vencer (`?dias=30`, de 1 a 365) |
-| GET | `/api/auditoria` | Todas as ações (filtros: `entidade`, `acao`, `usuario`, `pagina`) |
+| POST | `/api/documentos/vencimentos/aviso` | Manda agora o e-mail de vencimentos para os administradores (administrador) |
+| GET | `/api/auditoria` | Todas as ações (filtros: `entidade`, `acao`, `usuario`, `pagina`). Aberturas de dados pessoais só com `acao=VISUALIZAR` |
 | GET | `/api/resumo` | Números mostrados no painel |
 
 ## Códigos de erro

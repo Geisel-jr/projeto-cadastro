@@ -18,9 +18,25 @@ const ACOES = {
   REDEFINIR_SENHA: { verbo: 'redefiniu a senha de', rotulo: 'Senha', classe: 'editar', semArtigo: true },
   PEDIDO_RECUPERACAO: { verbo: 'pediu um link para recuperar a senha', rotulo: 'Recuperação', classe: 'acesso', acesso: true },
   RECUPERAR_SENHA: { verbo: 'criou uma nova senha pelo link do e-mail', rotulo: 'Senha', classe: 'editar', acesso: true },
+  // LGPD: abriu os dados completos (a lista mostra o CPF mascarado)
+  VISUALIZAR: { verbo: 'abriu os dados completos de', rotulo: 'Visualização', classe: 'acesso', semArtigo: true },
+  // A exportação é de uma lista inteira, não de um registro
+  EXPORTAR: { verbo: 'exportou uma planilha', rotulo: 'Exportação', classe: 'acesso', acesso: true },
 };
 
-const METODOS = { senha: 'Com e-mail e senha', google: 'Com Google' };
+const METODOS = {
+  senha: 'Com e-mail e senha',
+  google: 'Com Google',
+  'senha e código por e-mail': 'Com e-mail, senha e código enviado por e-mail',
+};
+
+// "Pessoas · 24 registros · busca "maria"" (o que foi exportado)
+function descreverExportacao(config, dados) {
+  const partes = [`${config?.plural || 'Lista'}${dados.lista === 'excluidos' ? ' excluídas' : ''}`];
+  partes.push(`${dados.total} ${dados.total === 1 ? 'registro' : 'registros'}`);
+  if (dados.busca) partes.push(`busca "${dados.busca}"`);
+  return partes.join(' · ');
+}
 
 // Usuários não têm formulário de cadastro como empresas e pessoas; este resumo basta
 // para o histórico nomear o usuário e mostrar o que mudou.
@@ -98,7 +114,8 @@ export default function Historico({ itens, mostrarRegistro = false, onAbrir }) {
               </span>
 
               {acao.anexo && dados && <div className="historico-detalhe">{descreverDocumento(dados)}</div>}
-              {item.acao === 'LOGIN' && dados?.metodo && <div className="historico-detalhe">{METODOS[dados.metodo]}</div>}
+              {item.acao === 'LOGIN' && dados?.metodo && <div className="historico-detalhe">{METODOS[dados.metodo] || dados.metodo}</div>}
+              {item.acao === 'EXPORTAR' && dados && <div className="historico-detalhe">{descreverExportacao(config, dados)}</div>}
               {item.motivo && (
                 <div className="historico-detalhe" title={item.motivo}>
                   <span className="limite-linhas">Motivo: {item.motivo}</span>

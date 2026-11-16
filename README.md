@@ -17,8 +17,8 @@ restaurado depois, e toda alteração fica na auditoria com o nome de quem fez.
 
 ## Tecnologias
 
-- React 19 e React Router no front-end, com CSS próprio
-- Node.js 20 e Express 5 na API
+- React 19 e React Router no front-end, montado com o Vite e com CSS próprio
+- Node.js 24 e Express 5 na API
 - PostgreSQL 16, com as tabelas criadas por migrations
 - MinIO para guardar os arquivos
 - JWT e scrypt no login, além do login com Google
@@ -36,13 +36,22 @@ restaurado. Cada inclusão, alteração, exclusão e restauração vai para a au
 registro estava antes e depois.
 
 Cada empresa pode ter documentos anexados, com data de validade. Os arquivos ficam no MinIO, e o painel
-mostra o que venceu e o que vence nos próximos 30 dias.
+mostra o que venceu e o que vence nos próximos 30 dias. Toda semana os administradores recebem essa lista
+por e-mail, e no painel também dá para mandar o e-mail na hora.
+
+As listas de empresas e pessoas podem ser baixadas em planilha (CSV, que abre no Excel), com a busca e o
+filtro que estiverem na tela.
+
+Por causa da LGPD, a lista de pessoas mostra o CPF mascarado (`***.456.789-**`). O CPF completo só aparece
+quando alguém abre o cadastro, e isso fica registrado na auditoria, assim como cada planilha exportada.
 
 Para entrar é preciso login, com senha ou com a conta Google. Tem recuperação de senha por e-mail, e o
 administrador recebe um código no e-mail a cada login (verificação em duas etapas). Os e-mails saem pelo
 Gmail.
 
 Tem também backup automático do banco e dos arquivos uma vez por dia, e a documentação da API com Swagger.
+As regras principais têm testes automáticos, inclusive testes de integração que sobem a API com um banco
+de teste, e o GitHub roda todos eles a cada push.
 
 ## Instalação
 

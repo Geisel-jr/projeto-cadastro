@@ -58,6 +58,10 @@ services:
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       COOKIE_SECURE: ${COOKIE_SECURE:-false}
       DADOS_EXEMPLO: ${DADOS_EXEMPLO:-true} # empresas, pessoas e documentos de exemplo na primeira subida
+      FUSO_HORARIO: ${FUSO_HORARIO:-America/Sao_Paulo} # datas das planilhas e horário do aviso semanal
+      AVISO_VENCIMENTOS: ${AVISO_VENCIMENTOS:-true} # e-mail semanal de documentos vencendo para os administradores
+      AVISO_VENCIMENTOS_DIA: ${AVISO_VENCIMENTOS_DIA:-1} # 0 = domingo, 1 = segunda ... 6 = sábado
+      AVISO_VENCIMENTOS_HORA: ${AVISO_VENCIMENTOS_HORA:-8}
       MFA_ADMIN: ${MFA_ADMIN:-true} # administradores confirmam o login com código por e-mail
       # E-mail (recuperação de senha). Padrão: Mailpit local; em produção, um SMTP real
       APP_URL: ${APP_URL:-http://localhost:3000}

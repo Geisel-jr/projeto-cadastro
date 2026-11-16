@@ -14,23 +14,34 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version-file: .nvmrc # mesma versão do Docker (Node 24 LTS)
           cache: npm
 
       - name: Instalar dependências
         run: npm install
 
       - name: Rodar testes
-        run: npm test -- --watchAll=false
-        env:
-          CI: true
+        run: npm test
 
       - name: Gerar build
         run: npm run build
 
   api:
-    name: API (dependências, sintaxe e testes de segurança)
+    name: API (sintaxe, testes de unidade e de integração)
     runs-on: ubuntu-latest
+    # Banco só para os testes de integração (a API cria e apaga o banco cadastros_teste)
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     defaults:
       run:
         working-directory: api
@@ -39,7 +50,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version-file: .nvmrc # mesma versão do Docker (Node 24 LTS)
           cache: npm
           cache-dependency-path: api/package-lock.json
 
@@ -49,8 +60,11 @@ jobs:
       - name: Verificar sintaxe
         run: for arquivo in *.js; do node --check "$arquivo"; done
 
-      - name: Testes de segurança (senhas e tokens)
+      - name: Testes de unidade (senhas, tokens e documentação)
         run: npm test
+
+      - name: Testes de integração (API de verdade com banco)
+        run: npm run test:integracao
 
   docker:
     name: Docker (sobe tudo e testa)
@@ -62,6 +76,7 @@ jobs:
       ADMIN_EMAIL: admin@ci.local
       ADMIN_PASSWORD: SenhaProvisoria1
       DADOS_EXEMPLO: "false" # os testes contam registros a partir de um banco vazio
+      AVISO_VENCIMENTOS: "false" # os testes conferem quais e-mails chegam no Mailpit
     steps:
       - uses: actions/checkout@v4
 
@@ -172,6 +187,10 @@ jobs:
           esperar "O link não funciona duas vezes" "$(status -X POST $URL/auth/redefinir -H "$J" -d "{\"token\":\"$CODIGO\",\"novaSenha\":\"OutraSenha44\"}")" 400
           esperar "Senha antiga não entra mais" "$(status -X POST $URL/auth/login -H "$J" -d '{"email":"admin@ci.local","senha":"SenhaDefinitiva2"}')" 401
           esperar "Senha nova entra (e pede o código)" "$(curl -s -X POST $URL/auth/login -H "$J" -d '{"email":"admin@ci.local","senha":"RecuperadaNaCI3"}' | grep -c '"desafio"')" 1
+
+          # LGPD e exportação
+          esperar "Lista de pessoas mostra o CPF mascarado" "$(curl -s $URL/pessoas -H "$U" | grep -cF '"cpf":"***.')" 1
+          esperar "Exportação gera a planilha" "$(curl -s $URL/empresas/exportar -H "$U" | grep -c 'Razão social;')" 1
 
           esperar "Documentação da API (Swagger) responde" "$(status http://localhost:3000/api/docs/)" 200
           esperar "Descrição OpenAPI disponível" "$(curl -s $URL/docs/openapi.json | grep -c '"openapi":"3')" 1

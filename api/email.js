@@ -40,8 +40,9 @@ const escapar = (texto) => String(texto).replace(/[&<>"']/g, (c) => (
 ));
 
 // Moldura HTML simples (tabelas e estilos inline, que é o que os clientes de e-mail entendem)
-function html({ titulo, paragrafos, botao, codigo, rodape }) {
-  const corpo = paragrafos.map((p) => `<p style="margin:0 0 16px;line-height:1.55">${escapar(p)}</p>`).join('');
+function html({ titulo, paragrafos, lista, botao, codigo, rodape }) {
+  const corpo = paragrafos.map((p) => `<p style="margin:0 0 16px;line-height:1.55">${escapar(p)}</p>`).join('')
+    + (lista ? `<ul style="margin:0 0 16px;padding-left:20px;line-height:1.55">${lista.map((i) => `<li style="margin-bottom:6px">${escapar(i)}</li>`).join('')}</ul>` : '');
   const destaque = codigo
     ? `<p style="margin:8px 0 24px;font-family:Consolas,Menlo,monospace;font-size:32px;font-weight:700;letter-spacing:8px">${escapar(codigo)}</p>`
     : '';
@@ -116,4 +117,30 @@ function enviarCodigoAcesso(usuario, codigo, minutos) {
   });
 }
 
-module.exports = { enviarLinkRecuperacao, avisarSenhaAlterada, enviarCodigoAcesso, configuracaoSmtp };
+// Resumo semanal dos documentos vencidos ou perto de vencer (ver avisos.js)
+function enviarAvisoVencimentos(usuario, itens, dias) {
+  const vencidos = itens.filter((i) => i.diasRestantes < 0).length;
+  const aVencer = itens.length - vencidos;
+  const prazo = (d) => {
+    if (d < 0) return `venceu há ${-d} ${-d === 1 ? 'dia' : 'dias'}`;
+    if (d === 0) return 'vence hoje';
+    return `vence em ${d} ${d === 1 ? 'dia' : 'dias'}`;
+  };
+  const lista = itens.map((i) =>
+    `${i.empresaNome}: ${i.tipo === 'Outros' && i.descricao ? i.descricao : i.tipo}, ${prazo(i.diasRestantes)} (${i.validade.split('-').reverse().join('/')})`);
+  const resumo = [vencidos && `${vencidos} ${vencidos === 1 ? 'vencido' : 'vencidos'}`, aVencer && `${aVencer} a vencer`]
+    .filter(Boolean).join(' e ');
+  const paragrafos = [
+    `Olá, ${usuario.nome}.`,
+    `Estes documentos das empresas estão vencidos ou vencem nos próximos ${dias} dias:`,
+  ];
+  const rodape = 'Você recebe este e-mail toda semana por ser administrador do CadastroHub.';
+  return enviar({
+    para: usuario.email,
+    assunto: `Documentos para renovar: ${resumo}`,
+    texto: `${paragrafos.join('\n\n')}\n\n${lista.map((l) => `- ${l}`).join('\n')}\n\nAbrir o painel: ${APP_URL}\n\n${rodape}`,
+    conteudoHtml: html({ titulo: 'Documentos para renovar', paragrafos, lista, botao: { texto: 'Abrir o painel', link: APP_URL }, rodape }),
+  });
+}
+
+module.exports = { enviarLinkRecuperacao, avisarSenhaAlterada, enviarCodigoAcesso, enviarAvisoVencimentos, configuracaoSmtp };

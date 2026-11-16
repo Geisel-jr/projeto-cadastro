@@ -1,0 +1,75 @@
+# Dependabot: toda segunda-feira o GitHub confere se há versões novas das bibliotecas,
+# das imagens Docker e das ações do CI, e abre um pull request com a atualização.
+# O CI roda em cada pull request, então dá para ver se a atualização quebra alguma coisa
+# antes de aceitar. Atualizações pequenas (minor e patch) vêm agrupadas num PR só.
+
+version: 2
+
+updates:
+  # Bibliotecas do front-end (React)
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      timezone: America/Sao_Paulo
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: chore
+    groups:
+      front:
+        update-types: [minor, patch]
+
+  # Bibliotecas da API
+  - package-ecosystem: npm
+    directory: /api
+    schedule:
+      interval: weekly
+      day: monday
+      timezone: America/Sao_Paulo
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: chore
+    groups:
+      api:
+        update-types: [minor, patch]
+
+  # Imagens dos Dockerfiles (front, API e backup)
+  - package-ecosystem: docker
+    directories: [/, /api, /backup]
+    schedule:
+      interval: weekly
+      day: monday
+      timezone: America/Sao_Paulo
+    commit-message:
+      prefix: chore
+    ignore:
+      # Troca de versão do Node é feita à mão, só entre versões LTS (pares)
+      - dependency-name: node
+        update-types: [version-update:semver-major]
+      # Uma versão nova do PostgreSQL (ex: 16 para 17) não abre o banco antigo sem migração
+      - dependency-name: postgres
+        update-types: [version-update:semver-major]
+
+  # Imagens do docker-compose.yml (PostgreSQL, MinIO, Mailpit)
+  - package-ecosystem: docker-compose
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      timezone: America/Sao_Paulo
+    commit-message:
+      prefix: chore
+    ignore:
+      - dependency-name: postgres
+        update-types: [version-update:semver-major]
+
+  # Ações usadas no CI (checkout, setup-node)
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      timezone: America/Sao_Paulo
+    commit-message:
+      prefix: chore

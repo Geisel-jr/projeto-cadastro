@@ -182,6 +182,7 @@ kbd.atalho {
   gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem;
 }
 .page-header-titulo { display: flex; align-items: center; gap: .5rem; min-width: 0; }
+.page-header-acoes { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
 .page-title { font-size: 22px; font-weight: 600; letter-spacing: -.02em; line-height: 1.25; }
 .page-sobretitulo { display: block; color: var(--texto-3); font-size: 12.5px; font-weight: 500; }
 
@@ -865,6 +866,12 @@ a.menu-item, a.marca { text-decoration: none; }
 .painel-colunas .vencimentos { grid-area: vencimentos; position: sticky; top: 72px; }
 
 .vencimentos-totais { display: flex; gap: .35rem; }
+.vencimentos-aviso {
+  display: flex; justify-content: space-between; align-items: center; gap: .75rem; flex-wrap: wrap;
+  padding: .55rem 1rem; border-bottom: 1px solid var(--borda); background: var(--superficie-2);
+  color: var(--texto-3); font-size: 12.5px;
+}
+.vencimentos-aviso .btn-texto { display: inline-flex; align-items: center; gap: .35rem; font-weight: 500; white-space: nowrap; }
 .lista-vencimentos { max-height: 440px; overflow-y: auto; border-radius: 0 0 var(--raio-g) var(--raio-g); }
 .lista-vencimentos li + li { border-top: 1px solid var(--borda); }
 .vencimento {

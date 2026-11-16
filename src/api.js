@@ -50,6 +50,19 @@ export const api = {
   restaurar: (entidade, id) => requisicao(`/${entidade}/${id}/restaurar`, { metodo: 'POST' }),
   auditoria: (filtros) => requisicao(`/auditoria?${new URLSearchParams(filtros)}`),
   resumo: () => requisicao('/resumo'),
+
+  // Baixa a lista filtrada em planilha (CSV). Como a rota exige login, o arquivo vem
+  // pelo fetch com o token e é salvo a partir da memória.
+  exportar: async (entidade, filtros = {}) => {
+    const busca = new URLSearchParams(Object.entries(filtros).filter(([, v]) => v !== '' && v != null));
+    const token = await garantirToken();
+    const response = await fetch(`${API_URL}/${entidade}/exportar?${busca}`, { headers: { Authorization: `Bearer ${token}` } });
+    if (!response.ok) throw new Error('Não foi possível gerar a planilha.');
+    const nome = response.headers.get('content-disposition')?.match(/filename="([^"]+)"/)?.[1] || `${entidade}.csv`;
+    const url = URL.createObjectURL(await response.blob());
+    Object.assign(document.createElement('a'), { href: url, download: nome }).click();
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  },
 };
 
 // ========== CONTA E USUÁRIOS ==========
@@ -101,6 +114,8 @@ export const mensagemErro = (erro) =>
 export const documentos = {
   tipos: () => requisicao('/documentos/tipos'),
   vencimentos: (dias = 30) => requisicao(`/documentos/vencimentos?dias=${dias}`),
+  // Manda agora o e-mail de vencimentos que sai toda semana para os administradores
+  enviarAviso: () => requisicao('/documentos/vencimentos/aviso', { metodo: 'POST' }),
   listar: (empresaId, status = 'ativos') => requisicao(`/empresas/${empresaId}/documentos?status=${status}`),
   remover: (empresaId, id, motivo) =>
     requisicao(`/empresas/${empresaId}/documentos/${id}`, { metodo: 'DELETE', corpo: { motivo } }),

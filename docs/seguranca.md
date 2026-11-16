@@ -18,6 +18,18 @@ de senha também vão para a auditoria.
 O único caso de exclusão de verdade (hard delete) é o das sessões vencidas há mais de 30 dias. Elas não
 servem para auditoria, porque os logins já ficam registrados na tabela `auditoria`.
 
+## Dados pessoais (LGPD)
+
+- A lista de pessoas vem da API com o CPF mascarado (`***.456.789-**`) e o RG escondido, menos os dois
+  últimos dígitos. A busca por CPF continua funcionando, porque ela é feita no banco.
+- O CPF completo só vem quando alguém abre o cadastro da pessoa. Cada abertura vira uma linha
+  `VISUALIZAR` na auditoria, com quem abriu, quando e de qual IP. Abrir o mesmo cadastro de novo em
+  menos de 10 minutos não gera outra linha.
+- Essas aberturas aparecem no histórico de cada pessoa. Na tela Auditoria, só quando o filtro
+  "Visualização de dados pessoais" é escolhido, para não tomar a linha do tempo.
+- Exportar uma lista em planilha também fica na auditoria (`EXPORTAR`), com quantos registros saíram e
+  qual busca estava aplicada, porque a planilha leva os dados completos para fora do sistema.
+
 ## Como funciona o login
 
 1. Quando a pessoa entra (com senha ou Google), a API devolve um token de acesso (JWT) que vale 15
@@ -120,3 +132,6 @@ Todas estão no `.env.example`.
 | `MFA_ADMIN` | `true` (padrão): administrador confirma o login com código por e-mail |
 | `APP_URL` | Endereço público do sistema, usado nos links dos e-mails |
 | `SMTP_*` | Servidor de e-mail (vazio = Mailpit) |
+| `AVISO_VENCIMENTOS` | `true` (padrão): e-mail semanal de documentos vencendo para os administradores |
+| `AVISO_VENCIMENTOS_DIA` / `AVISO_VENCIMENTOS_HORA` | Dia da semana (0 = domingo, 1 = segunda...) e hora do aviso |
+| `FUSO_HORARIO` | Fuso usado no aviso semanal, nas datas das planilhas e nos nomes dos backups |

@@ -21,7 +21,7 @@ let loginResponde;
 beforeEach(() => {
   window.history.pushState({}, '', '/');
   loginResponde = () => resposta(200, { tokenAcesso: tokenFalso(), usuario: usuarioTeste });
-  global.fetch = jest.fn((url, opcoes) => {
+  global.fetch = vi.fn((url, opcoes) => {
     if (url.includes('/auth/renovar')) return resposta(401, { error: 'Sessão encerrada.' });
     if (url.includes('/auth/config')) return resposta(200, { googleClientId: null });
     if (url.includes('/auth/login')) return loginResponde();
@@ -94,7 +94,7 @@ test('lista pede a página e a busca da URL ao servidor e mostra a paginação',
   window.history.pushState({}, '', '/empresas?q=p%C3%A3o&pagina=2');
   const empresaFalsa = (id) => ({ id, nome: `Empresa ${id}`, cnpj: '11222333000181', email: 'a@b.com', telefone: '11988887777' });
   const fetchPadrao = global.fetch;
-  global.fetch = jest.fn((url, opcoes) => (url.includes('/api/empresas?')
+  global.fetch = vi.fn((url, opcoes) => (url.includes('/api/empresas?')
     ? resposta(200, { itens: [empresaFalsa(21), empresaFalsa(22)], total: 57, pagina: 2, paginas: 3, limite: 20 })
     : fetchPadrao(url, opcoes)));
 
@@ -166,7 +166,7 @@ test('sem conta de demonstração, a tela de login não mostra dados de acesso',
 
 test('conta de demonstração aparece na tela de login, sem preencher o formulário', async () => {
   const fetchPadrao = global.fetch;
-  global.fetch = jest.fn((url, opcoes) => (url.includes('/auth/config')
+  global.fetch = vi.fn((url, opcoes) => (url.includes('/auth/config')
     ? resposta(200, { googleClientId: null, demo: { email: 'demo@cadastrohub.local', senha: 'Demo@2026' } })
     : fetchPadrao(url, opcoes)));
 
@@ -178,6 +178,57 @@ test('conta de demonstração aparece na tela de login, sem preencher o formulá
   // a pessoa ainda precisa colar os dados
   expect(screen.getByLabelText('E-mail')).toHaveValue('');
   expect(screen.getByLabelText('Senha')).toHaveValue('');
+});
+
+test('lista de pessoas mostra o CPF mascarado e exporta a planilha com a busca atual', async () => {
+  window.history.pushState({}, '', '/pessoas?q=ana');
+  const pessoaFalsa = { id: 4, nome: 'Ana Souza', cpf: '***.456.789-**', email: 'ana@empresa.com', telefone: '11988887777', dataNascimento: '1990-01-01' };
+  const fetchPadrao = global.fetch;
+  global.fetch = vi.fn((url, opcoes) => {
+    if (url.includes('/api/pessoas/exportar')) {
+      return Promise.resolve({
+        ok: true, status: 200,
+        headers: { get: () => 'attachment; filename="pessoas-2026-11-14.csv"' },
+        blob: () => Promise.resolve(new Blob(['Nome;CPF'])),
+      });
+    }
+    if (url.includes('/api/pessoas?')) return resposta(200, { itens: [pessoaFalsa], total: 1, pagina: 1, paginas: 1, limite: 20 });
+    return fetchPadrao(url, opcoes);
+  });
+  URL.createObjectURL = vi.fn(() => 'blob:planilha');
+  URL.revokeObjectURL = vi.fn();
+  const clicarLink = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+
+  render(<App />);
+  await preencherLogin();
+  expect(await screen.findByText('***.456.789-**')).toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole('button', { name: /Exportar/ }));
+  expect(await screen.findByText('Planilha gerada')).toBeInTheDocument();
+  const pedido = global.fetch.mock.calls.map(([url]) => url).find((url) => url.includes('/exportar'));
+  expect(pedido).toContain('q=ana');
+  expect(clicarLink).toHaveBeenCalled();
+  clicarLink.mockRestore();
+});
+
+test('administrador manda o aviso de vencimentos por e-mail pelo painel', async () => {
+  loginResponde = () => resposta(200, { tokenAcesso: tokenFalso(), usuario: { ...usuarioTeste, papel: 'admin' } });
+  const fetchPadrao = global.fetch;
+  global.fetch = vi.fn((url, opcoes) => (url.includes('/vencimentos/aviso')
+    ? resposta(200, { documentos: 1, enviados: 2 })
+    : fetchPadrao(url, opcoes)));
+
+  render(<App />);
+  await preencherLogin();
+  fireEvent.click(await screen.findByRole('button', { name: 'Enviar agora' }));
+  expect(await screen.findByText('E-mail enviado para 2 administradores.')).toBeInTheDocument();
+});
+
+test('operador não vê o botão de mandar o aviso por e-mail', async () => {
+  render(<App />);
+  await preencherLogin();
+  expect(await screen.findByText('Alvará de Funcionamento')).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Enviar agora' })).not.toBeInTheDocument();
 });
 
 const desafioFalso = { desafio: 'abc', email: 'an***@empresa.com', minutos: 10, reenviarEm: 30, reenvios: 2 };

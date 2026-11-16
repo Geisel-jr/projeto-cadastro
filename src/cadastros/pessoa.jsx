@@ -104,7 +104,16 @@ const pessoa = {
         </div>
       ),
     },
-    { titulo: 'CPF', ordem: 'cpf', render: (p) => <span className="mono">{mascaraCPF(p.cpf)}</span> },
+    // A API manda o CPF mascarado na lista (LGPD); o completo aparece ao abrir a pessoa
+    {
+      titulo: 'CPF',
+      ordem: 'cpf',
+      render: (p) => (
+        <span className="mono" title={p.cpf?.includes('*') ? 'CPF completo ao abrir o cadastro' : undefined}>
+          {p.cpf?.includes('*') ? p.cpf : mascaraCPF(p.cpf)}
+        </span>
+      ),
+    },
     { titulo: 'Telefone', render: (p) => mascaraTelefone(p.celular || p.telefone) },
     {
       titulo: 'Nascimento',

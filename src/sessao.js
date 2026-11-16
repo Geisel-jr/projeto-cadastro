@@ -5,7 +5,7 @@
 // - O refresh token fica num cookie httpOnly que o JavaScript não enxerga; a API o usa
 //   em /api/auth/renovar para entregar um novo token de acesso.
 
-export const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+export const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
 let tokenAcesso = null;
 let renovacaoEmAndamento = null;

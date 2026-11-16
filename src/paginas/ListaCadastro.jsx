@@ -26,7 +26,21 @@ export default function ListaCadastro({ config, onNavegar, notificar }) {
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState(null);
   const [excluindo, setExcluindo] = useState(null);
+  const [exportando, setExportando] = useState(false);
   const campoBusca = useRef(null);
+
+  // Planilha com tudo o que a lista mostra agora (mesma busca, situação e ordem, sem paginação)
+  const exportar = async () => {
+    setExportando(true);
+    try {
+      await api.exportar(config.entidade, { status, q: termo, ordem, direcao });
+      notificar('sucesso', 'Planilha gerada', `${resultado.total} ${resultado.total === 1 ? 'registro' : 'registros'} exportados.`);
+    } catch (e) {
+      notificar('erro', 'Não foi possível exportar', mensagemErro(e));
+    } finally {
+      setExportando(false);
+    }
+  };
 
   // Altera parâmetros da URL; qualquer mudança que não seja de página volta para a página 1
   const alterar = useCallback((novos, { substituir = false } = {}) => {
@@ -223,9 +237,19 @@ export default function ListaCadastro({ config, onNavegar, notificar }) {
     <>
       <div className="page-header">
         <h1 className="page-title">{config.plural}</h1>
-        <button className="btn btn-primario" onClick={() => onNavegar({ pagina: 'form', entidade: config.entidade })}>
-          <Icone nome="mais" tamanho={16} /> {config.novo}
-        </button>
+        <div className="page-header-acoes">
+          <button
+            className="btn btn-secundario"
+            onClick={exportar}
+            disabled={exportando || !resultado?.total}
+            title="Baixa a lista com a busca e o filtro atuais, para abrir no Excel"
+          >
+            {exportando ? <span className="spinner" /> : <Icone nome="download" tamanho={16} />} Exportar
+          </button>
+          <button className="btn btn-primario" onClick={() => onNavegar({ pagina: 'form', entidade: config.entidade })}>
+            <Icone nome="mais" tamanho={16} /> {config.novo}
+          </button>
+        </div>
       </div>
 
       <div className="painel">

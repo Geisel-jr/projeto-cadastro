@@ -175,7 +175,7 @@ function Aplicacao() {
       {!senhaProvisoria && (
         <main className="container conteudo" id="conteudo" tabIndex={-1}>
           <Routes>
-            <Route path="/" element={<Painel {...props} />} />
+            <Route path="/" element={<Painel {...props} usuario={usuario} />} />
             {Object.keys(CADASTROS).map((entidade) => [
               <Route key={entidade} path={`/${entidade}`}
                 element={<ListaCadastro key={entidade} config={CADASTROS[entidade]} {...props} />} />,
