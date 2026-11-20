@@ -256,6 +256,16 @@ module.exports = {
     },
 
     ...rotasCadastro('empresas', 'empresa', ref('Empresa')),
+    '/empresas/enviar-dados': {
+      post: {
+        tags: ['Empresas'], summary: 'Coloca na fila (RabbitMQ) o envio dos dados da empresa por e-mail',
+        description: 'O worker lê a fila, busca a empresa pelo CNPJ e manda a ficha para o e-mail dela. '
+          + 'Se o CNPJ não for encontrado (ou a empresa estiver excluída), avisa os administradores. '
+          + 'Para testar o caso "não encontrado", mande um CNPJ que não existe.',
+        requestBody: corpo({ type: 'object', required: ['cnpj'], properties: { cnpj: { type: 'string', example: '11.222.333/0001-81' } } }),
+        responses: { 202: ok('Pedido colocado na fila'), ...erros(400, 401, 503) },
+      },
+    },
     '/empresas/opcoes': { get: { tags: ['Empresas'], summary: 'Id e nome das empresas ativas (campo de empresa da pessoa)', responses: { 200: ok('Lista curta'), ...erros(401) } } },
     ...rotasCadastro('pessoas', 'pessoa', ref('Pessoa')),
 

@@ -21,6 +21,7 @@ restaurado depois, e toda alteração fica na auditoria com o nome de quem fez.
 - Node.js 24 e Express 5 na API
 - PostgreSQL 16, com as tabelas criadas por migrations
 - MinIO para guardar os arquivos
+- RabbitMQ para a fila de e-mails, lida por um worker em outro container
 - JWT e scrypt no login, além do login com Google
 - nodemailer para os e-mails pelo Gmail, e Mailpit para testar
 - Docker Compose, Nginx e GitHub Actions
@@ -44,6 +45,11 @@ filtro que estiverem na tela.
 
 Por causa da LGPD, a lista de pessoas mostra o CPF mascarado (`***.456.789-**`). O CPF completo só aparece
 quando alguém abre o cadastro, e isso fica registrado na auditoria, assim como cada planilha exportada.
+
+Tem uma fila no RabbitMQ para mandar a ficha da empresa por e-mail. A API coloca o CNPJ na fila (pelo
+botão no cadastro da empresa, ou sozinha quando uma empresa nova é cadastrada) e um worker vai lendo: se
+achar a empresa, manda os dados para o e-mail dela, e se não achar, avisa os administradores. Expliquei
+como funciona e comparei com os serviços de fila das nuvens em [docs/filas.md](docs/filas.md).
 
 Para entrar é preciso login, com senha ou com a conta Google. Tem recuperação de senha por e-mail, e o
 administrador recebe um código no e-mail a cada login (verificação em duas etapas). Os e-mails saem pelo
@@ -79,6 +85,7 @@ Outros endereços que podem ser úteis:
 | http://localhost:3000/api/docs | Documentação da API (Swagger), onde dá para testar as rotas |
 | http://localhost:8025 | E-mails enviados pelo sistema (Mailpit) |
 | http://localhost:9001 | Arquivos no MinIO (usuário `minioadmin`, senha `minioadmin123`) |
+| http://localhost:15672 | Filas no RabbitMQ (usuário `cadastrohub`, senha `cadastrohub123`) |
 | http://localhost:5000/api/health | Mostra se a API e o banco estão funcionando |
 
 Para parar:
@@ -115,5 +122,6 @@ pelas migrations e validações de hoje.
 ## Documentação
 
 - [docs/seguranca.md](docs/seguranca.md): login, sessões, MFA, recuperação de senha, Google e variáveis do `.env`
+- [docs/filas.md](docs/filas.md): a fila de e-mails, os dois jeitos de tirar mensagem da fila, fila x mensageria e os serviços das nuvens
 - [docs/api.md](docs/api.md): lista das rotas da API (a versão interativa fica em http://localhost:3000/api/docs)
 - [docs/operacao.md](docs/operacao.md): documentos, backup, como rodar sem Docker, testes e pastas do projeto

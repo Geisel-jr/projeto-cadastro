@@ -95,4 +95,4 @@ const COLUNAS_EXCLUSAO = [
 const mascararCpf = (cpf) => (cpf ? `***.${cpf.slice(3, 6)}.${cpf.slice(6, 9)}-**` : cpf);
 const mascararRg = (rg) => (rg ? `${'*'.repeat(Math.max(rg.length - 2, 0))}${rg.slice(-2)}` : rg);
 
-module.exports = { gerarCsv, mascararCpf, mascararRg, COLUNAS_EMPRESA, COLUNAS_PESSOA, COLUNAS_EXCLUSAO };
+module.exports = { gerarCsv, mascararCpf, mascararRg, FORMATOS, COLUNAS_EMPRESA, COLUNAS_PESSOA, COLUNAS_EXCLUSAO };

@@ -10,6 +10,7 @@ const { pool } = require('./db');
 const rotasCadastro = require('./cadastros');
 const { rotasDocumentos, buscarVencimentos, TIPOS_DOCUMENTO, TIPOS_ARQUIVO, TAMANHO_MAXIMO } = require('./documentos');
 const { enviarAviso } = require('./avisos');
+const { publicarEmailEmpresa } = require('./fila');
 const { REGRAS_EMPRESA, REGRAS_PESSOA } = require('./validacoes');
 const { COLUNAS_EMPRESA, COLUNAS_PESSOA, mascararCpf, mascararRg } = require('./exportacao');
 const { linhaParaObjeto, ErroHttp } = require('./util');
@@ -98,6 +99,17 @@ app.post('/api/documentos/vencimentos/aviso', exigirPapel('admin'), async (req, 
 
 app.use('/api/empresas/:empresaId/documentos', rotasDocumentos({ pool }));
 
+// ========== FILA (RabbitMQ) ==========
+
+// Coloca na fila o pedido de mandar por e-mail os dados da empresa deste CNPJ.
+// Quem lê a fila e manda o e-mail é o worker (worker.js), em outro container.
+app.post('/api/empresas/enviar-dados', async (req, res) => {
+  const cnpj = String(req.body?.cnpj ?? '').trim().slice(0, 30);
+  if (!cnpj) throw new ErroHttp(400, 'Informe o CNPJ.', { cnpj: 'Informe o CNPJ.' });
+  await publicarEmailEmpresa(cnpj, req.usuario);
+  res.status(202).json({ mensagem: 'Pedido colocado na fila. O e-mail sai em instantes.' });
+});
+
 // ========== CADASTROS ==========
 
 app.use('/api/empresas', rotasCadastro({
@@ -118,6 +130,8 @@ app.use('/api/empresas', rotasCadastro({
   },
   opcoes: ['t.nome_fantasia', 't.nome'],
   exportacao: COLUNAS_EMPRESA,
+  // Empresa nova: a confirmação com os dados vai para o e-mail dela, pela fila
+  aoCriar: (empresa, req) => publicarEmailEmpresa(empresa.cnpj, req.usuario),
   // Junto com a empresa vem a quantidade de documentos e se falta o Cartão CNPJ
   consulta: `SELECT t.*,
                (SELECT COUNT(*) FROM documentos d

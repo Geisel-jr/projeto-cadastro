@@ -1,4 +1,5 @@
 const nodemailer = require('nodemailer');
+const { FORMATOS } = require('./exportacao');
 
 // Envio de e-mails por SMTP. No Docker, o padrão é o Mailpit (http://localhost:8025),
 // que recebe tudo e mostra numa página, sem entregar a ninguém. Para enviar de verdade
@@ -17,6 +18,11 @@ function configuracaoSmtp() {
       port: Number(process.env.SMTP_PORT) || 587,
       secure: process.env.SMTP_SECURE === 'true', // true na porta 465; false na 587 (STARTTLS)
       auth: usuario ? { user: usuario, pass: senha } : undefined,
+      // O padrão do nodemailer espera até 2 minutos por um servidor fora do ar. Com prazos curtos,
+      // o login com código e o worker da fila recebem o erro logo em vez de ficarem travados.
+      connectionTimeout: 10000,
+      greetingTimeout: 10000,
+      socketTimeout: 20000,
     },
     // O Gmail troca qualquer remetente pela conta que fez o login; por isso o padrão é a própria conta
     remetente: process.env.SMTP_FROM || (usuario ? `CadastroHub <${usuario}>` : 'CadastroHub <nao-responda@cadastrohub.local>'),
@@ -143,4 +149,67 @@ function enviarAvisoVencimentos(usuario, itens, dias) {
   });
 }
 
-module.exports = { enviarLinkRecuperacao, avisarSenhaAlterada, enviarCodigoAcesso, enviarAvisoVencimentos, configuracaoSmtp };
+// ---------- E-mails do worker da fila (worker.js) ----------
+
+// "Campo: valor" de cada dado preenchido da empresa, já formatado
+function fichaEmpresa(empresa) {
+  const endereco = [
+    [empresa.logradouro, empresa.numero].filter(Boolean).join(', '),
+    empresa.complemento, empresa.bairro,
+    [empresa.cidade, empresa.estado].filter(Boolean).join('/'),
+    empresa.cep && `CEP ${FORMATOS.cep(empresa.cep)}`,
+  ].filter(Boolean).join(' · ');
+  return [
+    ['Razão social', empresa.nome],
+    ['Nome fantasia', empresa.nomeFantasia],
+    ['CNPJ', FORMATOS.cnpj(empresa.cnpj)],
+    ['Inscrição estadual', empresa.inscricaoEstadual],
+    ['Inscrição municipal', empresa.inscricaoMunicipal],
+    ['Data de abertura', empresa.dataAbertura && FORMATOS.data(empresa.dataAbertura)],
+    ['Porte', empresa.porte],
+    ['Ramo de atividade', empresa.ramoAtividade],
+    ['E-mail', empresa.email],
+    ['Telefone', empresa.telefone && FORMATOS.telefone(empresa.telefone)],
+    ['Celular', empresa.celular && FORMATOS.telefone(empresa.celular)],
+    ['Site', empresa.site],
+    ['Endereço', endereco],
+  ].filter(([, valor]) => valor).map(([campo, valor]) => `${campo}: ${valor}`);
+}
+
+// CNPJ encontrado: a ficha com os dados vai para o e-mail da própria empresa
+function enviarDadosEmpresa(empresa) {
+  const nome = empresa.nomeFantasia || empresa.nome;
+  const paragrafos = [
+    'Olá.',
+    `Estes são os dados de ${nome} cadastrados no CadastroHub. Confira se está tudo certo:`,
+  ];
+  const lista = fichaEmpresa(empresa);
+  const rodape = 'Se algum dado estiver errado, avise a pessoa que cuida do seu cadastro.';
+  return enviar({
+    para: empresa.email,
+    assunto: `Dados cadastrais de ${nome}`,
+    texto: `${paragrafos.join('\n\n')}\n\n${lista.join('\n')}\n\n${rodape}`,
+    conteudoHtml: html({ titulo: 'Dados cadastrais', paragrafos, lista, rodape }),
+  });
+}
+
+// CNPJ não encontrado (ou de empresa excluída): avisa o administrador
+function avisarCnpjNaoEncontrado(admin, cnpj, motivo, solicitadoPor) {
+  const paragrafos = [
+    `Olá, ${admin.nome}.`,
+    `Chegou pela fila um pedido para mandar os dados da empresa de CNPJ ${cnpj || '(vazio)'}, mas ${motivo}.`,
+    `Pedido feito por: ${solicitadoPor || 'não informado'}.`,
+  ];
+  const rodape = 'Este aviso foi enviado pelo serviço de fila (worker) do CadastroHub.';
+  return enviar({
+    para: admin.email,
+    assunto: `CNPJ não encontrado: ${cnpj || '(vazio)'}`,
+    texto: `${paragrafos.join('\n\n')}\n\n${rodape}`,
+    conteudoHtml: html({ titulo: 'CNPJ não encontrado', paragrafos, rodape }),
+  });
+}
+
+module.exports = {
+  enviarLinkRecuperacao, avisarSenhaAlterada, enviarCodigoAcesso, enviarAvisoVencimentos,
+  enviarDadosEmpresa, avisarCnpjNaoEncontrado, configuracaoSmtp,
+};

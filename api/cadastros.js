@@ -23,9 +23,10 @@ const LIMITE_EXPORTACAO = 10000; // linhas por planilha
 //   ordenacao: { chave da URL: expressão SQL } — só estas colunas podem ser usadas para ordenar
 //   opcoes:    expressões SQL do "nome" devolvido em /opcoes
 //   exportacao:  colunas da planilha ({ campo, titulo, formato }), ver exportacao.js
+//   aoCriar:     função chamada depois de um cadastro novo ser gravado (erros só vão para o log)
 //   privacidade: { mascarar(registro) } para dados pessoais. A lista vem mascarada e cada
 //                abertura do detalhe fica registrada na auditoria (LGPD)
-function rotasCadastro({ pool, tabela, regras, consulta, verificar, busca, ordenacao, opcoes, exportacao, privacidade }) {
+function rotasCadastro({ pool, tabela, regras, consulta, verificar, busca, ordenacao, opcoes, exportacao, privacidade, aoCriar }) {
   const router = express.Router();
   const campos = regras.map((regra) => regra.campo);
   const colunas = campos.map(paraSnake);
@@ -183,6 +184,8 @@ function rotasCadastro({ pool, tabela, regras, consulta, verificar, busca, orden
     });
 
     res.status(201).json(registro);
+    // Depois de gravado: tarefas extras (ex: colocar na fila) não podem desfazer o cadastro
+    if (aoCriar) aoCriar(registro, req).catch((erro) => console.warn(`⚠️  ${tabela}: ${erro.message}`));
   });
 
   router.put('/:id', async (req, res) => {

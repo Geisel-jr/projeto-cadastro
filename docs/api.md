@@ -27,6 +27,7 @@ outras precisam do cabeçalho `Authorization: Bearer <token>`.
 | PUT | `/api/usuarios/:id` | Altera nome, e-mail, perfil e se está ativo (administrador) |
 | POST | `/api/usuarios/:id/redefinir-senha` | Define uma senha provisória (administrador) |
 | GET | `/api/{cadastro}` | Lista com páginas: `?status=excluidos&q=texto&pagina=1&limite=20&ordem=nome&direcao=asc`. Devolve `{ itens, total, pagina, paginas, limite }` |
+| POST | `/api/empresas/enviar-dados` | Coloca o CNPJ na fila (RabbitMQ); o worker manda a ficha da empresa por e-mail ou avisa os administradores se não achar |
 | GET | `/api/empresas/opcoes` | Id e nome das empresas ativas (usado no campo de empresa da pessoa) |
 | GET | `/api/{cadastro}/exportar` | Baixa a lista em planilha CSV, com os mesmos filtros da lista (fica na auditoria) |
 | GET | `/api/{cadastro}/:id` | Um registro. Para pessoas, traz o CPF completo e a abertura fica na auditoria |

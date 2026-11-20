@@ -38,6 +38,20 @@ export default function FormularioCadastro({ config, id, onNavegar, notificar })
   const [historico, setHistorico] = useState(null);
   const [excluindo, setExcluindo] = useState(false);
   const [versaoHistorico, setVersaoHistorico] = useState(0); // muda quando um anexo é alterado
+  const [enviandoDados, setEnviandoDados] = useState(false);
+
+  // Coloca o CNPJ na fila; o worker busca a empresa e manda a ficha para o e-mail dela
+  const enviarDadosPorEmail = async () => {
+    setEnviandoDados(true);
+    try {
+      await api.enviarDadosEmpresa(registro.cnpj);
+      notificar('sucesso', 'Pedido na fila', `Os dados vão para ${registro.email} em instantes.`);
+    } catch (e) {
+      notificar('erro', 'Não foi possível enviar', mensagemErro(e));
+    } finally {
+      setEnviandoDados(false);
+    }
+  };
   const formulario = useRef(null);
 
   const excluido = Boolean(registro?.excluidoEm);
@@ -326,6 +340,17 @@ export default function FormularioCadastro({ config, id, onNavegar, notificar })
               {edicao && (
                 <button type="button" className="btn btn-perigo-suave" onClick={() => setExcluindo(true)}>
                   <Icone nome="lixeira" tamanho={16} /> Excluir
+                </button>
+              )}
+              {edicao && config.enviarPorEmail && (
+                <button
+                  type="button"
+                  className="btn btn-secundario"
+                  onClick={enviarDadosPorEmail}
+                  disabled={enviandoDados}
+                  title={`Manda os dados cadastrados para ${registro.email}`}
+                >
+                  {enviandoDados ? <span className="spinner" /> : <Icone nome="email" tamanho={16} />} Enviar dados por e-mail
                 </button>
               )}
               <button type="button" className="btn btn-secundario" onClick={voltar}>Cancelar</button>

@@ -170,6 +170,13 @@ jobs:
           esperar "Busca sem acento" "$(curl -s "$URL/empresas?q=empresa%20ci%20editada" -H "$U" | grep -o '"total":[0-9]*')" '"total":1'
           esperar "Busca sem resultado" "$(curl -s "$URL/empresas?q=inexistente" -H "$U" | grep -o '"total":[0-9]*')" '"total":0'
 
+          # Fila (RabbitMQ + worker): a API publica, o worker lê e o e-mail chega ao Mailpit
+          chegou() { for i in $(seq 1 20); do curl -s $MAILPIT/messages | grep -qF "$1" && { echo 1; return; }; sleep 1; done; echo 0; }
+          esperar "Empresa nova recebe a confirmação pela fila" "$(chegou '"Address":"ci@teste.com"')" 1
+          esperar "Pedido na fila retorna 202" "$(status -X POST $URL/empresas/enviar-dados -H "$J" -H "$U" -d '{"cnpj":"99.999.999/0001-99"}')" 202
+          esperar "CNPJ não encontrado avisa o administrador" "$(chegou '99.999.999/0001-99')" 1
+          esperar "Worker esvaziou a fila" "$(docker compose exec -T rabbitmq rabbitmqctl -q list_queues name messages | awk '$1 == "empresas.email" { print $2 }')" 0
+
           # Backup: gera a cópia do banco e espelha os arquivos
           docker compose exec -T backup backup.sh agora
           esperar "Backup do banco gerado" "$(ls backups/banco/*.dump 2>/dev/null | head -1 | grep -c '.dump')" 1
@@ -179,7 +186,7 @@ jobs:
           esperar "Pedido de recuperação responde 202" "$(status -X POST $URL/auth/esqueci -H "$J" -d '{"email":"admin@ci.local"}')" 202
           esperar "E-mail desconhecido recebe a mesma resposta" "$(status -X POST $URL/auth/esqueci -H "$J" -d '{"email":"ninguem@ci.local"}')" 202
           sleep 2
-          esperar "Só o e-mail cadastrado recebe mensagem" "$(curl -s $MAILPIT/messages | grep -o '"Address":"[^"]*"' | sort -u | tr '\n' ' ')" '"Address":"admin@ci.local" "Address":"nao-responda@cadastrohub.local" '
+          esperar "E-mail desconhecido não recebe mensagem" "$(curl -s $MAILPIT/messages | grep -c 'ninguem@ci.local')" 0
           MENSAGEM=$(curl -s $MAILPIT/messages | grep -o '"ID":"[^"]*"' | head -1 | cut -d'"' -f4)
           CODIGO=$(curl -s $MAILPIT/message/$MENSAGEM | grep -o 'redefinir-senha?token=[A-Za-z0-9_-]*' | head -1 | cut -d= -f2)
           esperar "Link do e-mail é válido" "$(status -X POST $URL/auth/redefinir/verificar -H "$J" -d "{\"token\":\"$CODIGO\"}")" 200

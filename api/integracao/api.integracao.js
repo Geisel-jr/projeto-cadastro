@@ -26,6 +26,7 @@ Object.assign(process.env, {
   DATABASE_NAME: BANCO,
   JWT_SECRET: 'segredo-dos-testes-de-integracao-com-tamanho-suficiente',
   SMTP_HOST: '', // sem SMTP, a API só escreve os e-mails no log (capturados abaixo)
+  RABBITMQ_URL: '', // fila desligada: os testes nunca mandam mensagem para o RabbitMQ de desenvolvimento
   MFA_ADMIN: 'true',
 });
 
@@ -235,4 +236,32 @@ test('aviso de vencimentos: só administrador manda, e só quando há documentos
   const email = emails.slice(antes).join('\n');
   assert.match(email, /Para: admin@teste\.local/);
   assert.match(email, /Padaria do João: Alvará de Funcionamento, venceu há 3 dias/);
+});
+
+test('fila: sem RabbitMQ, o pedido é recusado com 503 e o cadastro da empresa continua funcionando', async () => {
+  const pedido = await chamar('POST', '/empresas/enviar-dados', { token: tokens.operador, corpo: { cnpj: EMPRESA.cnpj } });
+  assert.equal(pedido.status, 503);
+  assert.equal((await chamar('POST', '/empresas/enviar-dados', { token: tokens.operador, corpo: {} })).status, 400);
+});
+
+test('worker: CNPJ encontrado manda os dados para o e-mail da empresa', async () => {
+  const { processarPedido } = require('../worker');
+  const antes = emails.length;
+  const resultado = await processarPedido(pool, { cnpj: EMPRESA.cnpj, solicitadoPor: 'Operador Teste' });
+  assert.deepEqual(resultado.para, ['contato@padaria.com']);
+  const email = emails.slice(antes).join('\n');
+  assert.match(email, /Para: contato@padaria\.com \| Assunto: Dados cadastrais de Padaria do João/);
+  assert.match(email, /CNPJ: 11\.222\.333\/0001-81/);
+});
+
+test('worker: CNPJ não encontrado ou de empresa excluída avisa os administradores', async () => {
+  const { processarPedido } = require('../worker');
+  const antes = emails.length;
+  const naoExiste = await processarPedido(pool, { cnpj: '99.999.999/0001-99', solicitadoPor: 'Operador Teste' });
+  assert.deepEqual(naoExiste.para, ['admin@teste.local']);
+  const excluida = await processarPedido(pool, { cnpj: '11.444.777/0001-61' }); // excluída num teste acima
+  assert.match(excluida.resultado, /excluída/);
+  const enviados = emails.slice(antes).join('\n');
+  assert.match(enviados, /Para: admin@teste\.local \| Assunto: CNPJ não encontrado: 99\.999\.999\/0001-99/);
+  assert.match(enviados, /Pedido feito por: Operador Teste/);
 });

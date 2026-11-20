@@ -50,6 +50,8 @@ export const api = {
   restaurar: (entidade, id) => requisicao(`/${entidade}/${id}/restaurar`, { metodo: 'POST' }),
   auditoria: (filtros) => requisicao(`/auditoria?${new URLSearchParams(filtros)}`),
   resumo: () => requisicao('/resumo'),
+  // Coloca na fila (RabbitMQ) o pedido de mandar os dados da empresa para o e-mail dela
+  enviarDadosEmpresa: (cnpj) => requisicao('/empresas/enviar-dados', { metodo: 'POST', corpo: { cnpj } }),
 
   // Baixa a lista filtrada em planilha (CSV). Como a rota exige login, o arquivo vem
   // pelo fetch com o token e é salvo a partir da memória.

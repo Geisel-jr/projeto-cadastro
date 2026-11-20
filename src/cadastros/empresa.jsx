@@ -8,6 +8,7 @@ const empresa = {
   plural: 'Empresas',
   novo: 'Nova empresa',
   documentos: true, // mostra o painel de documentos (anexos no MinIO) no formulário
+  enviarPorEmail: true, // botão que coloca na fila o envio dos dados para o e-mail da empresa
   nomeExibicao: (r) => r?.nomeFantasia || r?.nome || '—',
 
   abas: [

@@ -124,6 +124,9 @@ cadastros, documentos, backup, recuperação de senha e o código de acesso.
 │   ├── openapi.js        # Descrição da API mostrada pelo Swagger em /api/docs
 │   ├── exportacao.js     # Planilhas CSV e máscara do CPF na lista
 │   ├── avisos.js         # E-mail semanal de documentos vencendo
+│   ├── fila.js           # Conexão com o RabbitMQ e publicação na fila
+│   ├── worker.js         # Worker: lê a fila e manda os e-mails com os dados das empresas
+│   ├── filas-demonstracao.js  # Mostra a diferença entre ack automático e manual
 │   ├── seeds.js          # Cadastra os dados de exemplo na primeira vez
 │   ├── seeds/            # Dados de exemplo (empresas, pessoas e documentos fictícios)
 │   └── migrations/       # Scripts SQL que criam e atualizam o banco
@@ -133,5 +136,5 @@ cadastros, documentos, backup, recuperação de senha e o código de acesso.
 ├── vite.config.js        # Configuração do Vite e dos testes do front
 ├── nginx.conf            # Servidor do front (repassa /api para a API)
 ├── dockerfile            # Imagem do front
-└── docker-compose.yml    # Sobe banco, MinIO, API, front, e-mail e backup juntos
+└── docker-compose.yml    # Sobe banco, MinIO, RabbitMQ, API, worker, front, e-mail e backup juntos
 ```
