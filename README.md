@@ -17,7 +17,7 @@ restaurado depois, e toda alteração fica na auditoria com o nome de quem fez.
 
 ## Tecnologias
 
-- React 19 e React Router no front-end, montado com o Vite e com CSS próprio
+- React 19, React Router e Vite no front-end, com CSS próprio
 - Node.js 24 e Express 5 na API
 - PostgreSQL 16, com as tabelas criadas por migrations
 - MinIO para guardar os arquivos
@@ -40,24 +40,21 @@ Cada empresa pode ter documentos anexados, com data de validade. Os arquivos fic
 mostra o que venceu e o que vence nos próximos 30 dias. Toda semana os administradores recebem essa lista
 por e-mail, e no painel também dá para mandar o e-mail na hora.
 
-As listas de empresas e pessoas podem ser baixadas em planilha (CSV, que abre no Excel), com a busca e o
-filtro que estiverem na tela.
+Dá para baixar as listas de empresas e pessoas em planilha (abre no Excel). Por causa da LGPD, a lista de
+pessoas mostra o CPF mascarado (`***.456.789-**`). O completo só aparece quando alguém abre o cadastro, e
+isso fica na auditoria, junto com cada planilha baixada.
 
-Por causa da LGPD, a lista de pessoas mostra o CPF mascarado (`***.456.789-**`). O CPF completo só aparece
-quando alguém abre o cadastro, e isso fica registrado na auditoria, assim como cada planilha exportada.
-
-Tem uma fila no RabbitMQ para mandar a ficha da empresa por e-mail. A API coloca o CNPJ na fila (pelo
-botão no cadastro da empresa, ou sozinha quando uma empresa nova é cadastrada) e um worker vai lendo: se
-achar a empresa, manda os dados para o e-mail dela, e se não achar, avisa os administradores. Expliquei
-como funciona e comparei com os serviços de fila das nuvens em [docs/filas.md](docs/filas.md).
+Tem uma fila no RabbitMQ para mandar a ficha da empresa por e-mail. A API coloca o CNPJ na fila quando
+alguém clica no botão do cadastro, ou sozinha quando uma empresa nova é cadastrada. Um worker vai lendo a
+fila. Se achar a empresa, manda os dados para o e-mail dela. Se não achar, avisa os administradores.
+Expliquei como funciona em [docs/filas.md](docs/filas.md).
 
 Para entrar é preciso login, com senha ou com a conta Google. Tem recuperação de senha por e-mail, e o
 administrador recebe um código no e-mail a cada login (verificação em duas etapas). Os e-mails saem pelo
 Gmail.
 
-Tem também backup automático do banco e dos arquivos uma vez por dia, e a documentação da API com Swagger.
-As regras principais têm testes automáticos, inclusive testes de integração que sobem a API com um banco
-de teste, e o GitHub roda todos eles a cada push.
+Também tem backup automático uma vez por dia e a documentação da API com Swagger. E tem testes
+automáticos, alguns sobem a API de verdade com um banco de teste. O GitHub roda todos a cada push.
 
 ## Instalação
 

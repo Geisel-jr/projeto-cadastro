@@ -5,6 +5,9 @@
 // Os conceitos de fila usados aqui estão em docs/filas.md.
 require('dotenv').config({ quiet: true });
 
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
 const amqplib = require('amqplib');
 const { pool } = require('./db');
 const { RABBITMQ_URL, FILA_EMAIL_EMPRESA, prepararFilas } = require('./fila');
@@ -33,6 +36,7 @@ async function processarPedido(db, pedido) {
 }
 
 const esperar = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const ARQUIVO_PRONTO = path.join(os.tmpdir(), 'worker-pronto');
 
 // O RabbitMQ pode demorar alguns segundos para aceitar conexões depois de subir
 async function conectar() {
@@ -48,6 +52,7 @@ async function conectar() {
 }
 
 async function iniciar() {
+  fs.rmSync(ARQUIVO_PRONTO, { force: true }); // se o container reiniciou, o sinal antigo não vale
   const conexao = await conectar();
   conexao.on('error', (erro) => console.error('Erro na conexão com o RabbitMQ:', erro.message));
   // Sem conexão não há o que fazer: o worker sai e o Docker sobe ele de novo (restart: unless-stopped)
@@ -89,6 +94,8 @@ async function iniciar() {
     }
   }, { noAck: false });
 
+  // Sinal para o healthcheck do Docker: o worker só fica "saudável" depois de ouvir a fila
+  fs.writeFileSync(ARQUIVO_PRONTO, new Date().toISOString());
   console.log(`👂 Worker ouvindo a fila "${FILA_EMAIL_EMPRESA}"`);
 }
 

@@ -172,7 +172,11 @@ jobs:
 
           # Fila (RabbitMQ + worker): a API publica, o worker lê e o e-mail chega ao Mailpit
           chegou() { for i in $(seq 1 20); do curl -s $MAILPIT/messages | grep -qF "$1" && { echo 1; return; }; sleep 1; done; echo 0; }
-          esperar "Empresa nova recebe a confirmação pela fila" "$(chegou '"Address":"ci@teste.com"')" 1
+          # Empresa só para este teste: a "Empresa CI" é excluída logo depois de criada, e o worker
+          # processa o pedido com os dados do momento em que lê a fila (pode já estar excluída)
+          EMPRESA_FILA='{"nome":"Empresa da Fila","cnpj":"11444777000161","email":"fila@teste.com","telefone":"11988887777","cep":"01001000"}'
+          esperar "Empresa da fila criada" "$(status -X POST $URL/empresas -H "$J" -H "$U" -d "$EMPRESA_FILA")" 201
+          esperar "Empresa nova recebe a confirmação pela fila" "$(chegou '"Address":"fila@teste.com"')" 1
           esperar "Pedido na fila retorna 202" "$(status -X POST $URL/empresas/enviar-dados -H "$J" -H "$U" -d '{"cnpj":"99.999.999/0001-99"}')" 202
           esperar "CNPJ não encontrado avisa o administrador" "$(chegou '99.999.999/0001-99')" 1
           esperar "Worker esvaziou a fila" "$(docker compose exec -T rabbitmq rabbitmqctl -q list_queues name messages | awk '$1 == "empresas.email" { print $2 }')" 0
