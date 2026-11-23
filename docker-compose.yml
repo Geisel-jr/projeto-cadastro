@@ -101,7 +101,7 @@ services:
   # Fila de mensagens. A API coloca pedidos na fila e o worker tira e processa.
   # Painel web: http://localhost:15672 (usuário e senha abaixo)
   rabbitmq:
-    image: rabbitmq:4.1-management-alpine
+    image: rabbitmq:4.4-management-alpine
     restart: unless-stopped
     hostname: rabbitmq # o RabbitMQ guarda os dados pelo nome do servidor; fixo, eles sobrevivem a recriar o container
     environment:
